@@ -1,0 +1,209 @@
+Jned: notes
+
+01/05/13
+	grid object with cells containing links to buttons or panel objects	
+	mouse move, click, drag operations on buttons		
+01/06/13
+	multibutton groups		
+	menu switching functionality	
+	button processing brain method	
+01/08/13
+	add more buttons, extend menu	
+	add brain functionality for menu switching
+	add null button panel feature in multibutton
+	multibutton push option	
+	select sub-menu with selection of super-menu
+01/20/13
+	correct image links, with hl
+01/21/13
+	remove switch buttons
+	create fields for grid coordinates instead of literal ints
+01/27/13
+	text area
+	basic menu bar
+01/30/13
+	level area object
+	tile drawing in level area
+02/26/13
+	tile selection box drawing
+	tile selection box dragging
+02/27/13
+	tile editing mode
+	menu fixes
+03/05/13
+	tile editing drag bug fix
+03/16/13
+	action buttons
+	level data text output/input
+	level data clipboard copy/paste
+03/20/13
+	history & undo/redo
+03/21/13
+	gridlines and snapping buttons
+	drop-down panels
+	drop-down panel gridmember containment/display
+	labels
+03/22/13
+	JComponents inside drop-down panels
+	relative grid members in drop-down panels
+03/24/13
+	action commands for combo boxes
+	labels inside buttons
+	save/delete/primary/secondary/tertiary buttons in gridlines panel
+03/25/13
+	spacing/offset/symmetry/single&double/on&off items in gridlines panel
+03/26/13
+	overlay objects
+	formatting of text fields in overlay objects
+	overlay object internal data
+	switching for primary/secondary/tertiary gridlines
+	calculation of grid points
+	drawing of gridlines
+	drop panels go away with external click, not just moving mouse away
+03/27/13
+	Nfile object
+	nio operations
+	nfile entries
+	nfile reading & writing to file
+03/29/13
+	nfile writing debugging
+	grid preset menu reading from config file
+	grid preset menu writing to config file
+	clicking outside of drop panel doesn't do anything else but close top panel
+03/31/13
+	snap point drop-down menu
+	snap reading/writing with config file
+	showing snap points
+04/01/13
+	blank colored panel grid members
+	on/off text background not part of grid/snap drop-down panels
+	Item, DirectionalItem, Drone, Door, Exit and Launchpad objects
+	Item toString methods
+04/04/13
+	Mouse methods for adding items, selecting items, dragging items
+04/05/13
+	More work on item mouse methods
+	Temporary painting and collision checking on items
+	Compile-time debugging on all item related code
+04/06/13
+	Item mode changing
+	Item direction and drone behavior memory
+	Bug fixing for launchpad shape
+	Bug fixing for direction memory, drawing items, transparent colors
+	Bug fixing for drag operations
+04/07/13
+	Focus switching
+	Snap-to functionality for adding items
+	Selection coloring and bug-fixing
+04/08/13
+	Separate highlighting, selecting, and dragging for doors and switches
+	Separate highlighting, selecting, and dragging for exit door and switch
+	Dragging in snap-to mode
+	Extensive debugging for doors in snap-to mode (I can't believe it works! Yes!) Copied for Exit
+	Position snapping for drones
+	Position snapping for floor guard
+04/09/13
+	Reading items from text box
+	Undo/redo functionality for items
+	Subclasses for turrets and normal door
+	Subclasses and polygons for every item except Player
+04/10/13
+	Player subclass and polygon
+	Image plugging for player
+04/11/13
+	Image plugging and correct highlight/selection coloring for all items
+	Door triggers
+	Buttons for triggers and paths
+	Button highlighting and action button debugging
+	Tile shift-pressed editing
+04/16/13
+	central iamge bank
+	button drawing using image bank
+	button highlighting with translucent layer
+04/17/13
+	item drawing using image bank
+04/18/13
+	active player is always first object in item list
+	textbox highlighting of items and tiles when textbox has focus
+	copy/cut/paste for tile blocks
+	image switching with shift press for tile buttons
+	text box no longer has focus on start-up
+04/22/13
+	drone paths, other than quasi-random
+	Image files include super buttons for switch doors
+	Borders around buttons
+05/01/13
+	door ghost lines instead of rectangles
+	triggers/paths button with text inside
+	change gridlines/snapping buttons
+	fix item history bug
+	Left click to cancel selection box in tile mode, right click to bring down copy paste menu
+	recursive method for paths
+05/02/13
+	quasi-random
+05/05/13
+	ctrl-clicking a selected item removes it from the selection
+	item drop-down menus appear with right click 
+05/06/13
+	item copying, cutting and pasting
+	importing launchpad float values from text
+	nudging
+	direction changing
+	drone behavior changing
+	active player setting
+05/07/13
+	launchpad editing menus
+	launchpad power/direction line drawing
+05/09/13
+	launchpad editing for power, direction, both
+05/12/13
+	added delete to right-click item menus
+	added fill/erase to right-click tile menu
+	cut/copy/paste for tiles updates history
+	
+04/17/14
+	began work on key signature class - all keys mapped to an array of action indices
+04/27/14
+	key signature class complete with sparse array, simultaneous key presses, and mapped to actions in Jned
+	Button push method handles unpushing of group
+	Multibuttons and buttons both implement Pushable interface
+	tile/items/enemies/sub buttons all work with key shortcuts, including diagonal directions for launchpad
+04/28/14
+	keyboard shortcuts for drone behaviors, show/hide/toggle triggers and paths, undo/redo, textbox operations, copy/paste/cut, and nudging
+	mouse move method now stores mouse point in item selection mode using orow/ocol. Necessary for proper pasting via keyboard shortcuts (and later bar menu)
+04.31.14
+	keyboard shortcuts for gridlines, snapping, and snap points. Framework for arbitrary additional shortcuts for custom grid and snap settings
+05.01.14
+	beginning of KeyShortcuts window: Frame, layout, buttons (don't work yet). Creation of PanelButton and KeySetting classes. 
+05.03.14
+	KeySetting class linked to KeySignature. Methods for returning action and key names from action numbers. KeyShortcuts window lists all actions.
+05.06.14
+	KeySignature has dialog for changing keys with own listener, can add, remove, and change key settings. Changes are kept in 'custom' key settings in config.
+	Collisions handled with a dialog.
+05.07.14
+	Key setting presets can be saved and deleted just like grid and snap settings
+05.08.14
+	Grid and snap save/delete drop panels switched to dialog windows. Key shortcuts frame switched to non-modal dialog. File chooser started.
+05.11.14
+	File chooser set up. Buttons and level list in place. Button pushes do not yet do anything.
+05.14.14
+	Text boxes for each field added in save mode of file chooser. Selection of levels works. Open and Cancel buttons work. Debug of item indices in level area (decimal player position would mess it up)
+05.15.14
+	Level selection in save mode fills in text fields. Overwrite dialog added. Saving works. File chooser accessed from Jned menu 'Save', 'Save As', and 'Open' commands.
+06.03.14
+	File path choosing for levels file in open/save dialog. Persistant.
+06.04.14
+	File io no longer hogs access to userlevels file. Can go back and forth between saving/loading levels and playing them in n
+
+	backslash clicking for deleting objects in reverse order
+	allow for decimal player positions
+	change door trigger line color (same as tiles presently)
+	get rid of the grid
+	add item menus to edit menu
+	gridlines/view snap points/drone paths/door triggers for view menu
+	debug launchpad - sometimes won't reverse direction when editing power - different mouse interface needed
+	launch pad values textfields in drop-down menu, or perhaps lefthand buttons
+	drone path length setting
+	teleporter button
+
+

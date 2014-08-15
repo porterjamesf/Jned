@@ -1,0 +1,83 @@
+Names for Things and Stuff
+
+For the pushed version of each button, just append "pushed" to the end of the name.
+For example,
+	Erase
+and	Erasepushed
+
+
+
+
+Tiles
+	45tile
+		45tileA	
+		45tileQ
+		45tileS
+		45tileW
+			(the same A, Q, S, and W things go for all 8 tile sets)
+	63thintile
+	27thintile
+	Concavetile
+	Halftile
+	63thicktile
+	27thicktile
+	Convextile
+	Erase
+	Fill
+
+Objects
+	Player
+	Gold
+	Bounceblock
+	Exit
+		Exitdoor
+		Exitswitch
+	Oneway
+		OnewayA
+		OnewayD
+		OnewayS
+		OnewayW
+	Normaldoor
+		NormaldoorA
+		NormaldoorD
+		NormaldoorS
+		NormaldoorW
+		Lockeddoorswitch
+			(the same 5 go for all doors, except of course no Normaldoorswitch)
+	Lockeddoor
+	Trapdoor
+	Launchpad
+		LaunchpadA
+		LaunchpadAS
+		LaunchpadAW
+		LaunchpadD
+		LaunchpadDS
+		LaunchpadDW
+		LaunchpadS
+		LaunchpadW
+
+Enemies
+	Gaussturret
+	Hominglauncher
+	Mine
+	Floorguard
+	Thwump
+		ThwumpA
+		ThwumpD
+		ThwumpS
+		ThwumpW
+	Zapdrone
+		ZapdroneA
+		ZapdroneD
+		ZapdroneS
+		ZapdroneW
+		Zapdronedumbcw
+		Zapdronedumbccw
+		Zapdronesurfacecw
+		Zapdronesurfaceccw
+		Zapdronealt
+		Zapdronerand
+			(the same direction and behavior suffixes go for all drones)
+	Seekerdrone
+	Laserdrone
+	Chainggundrone
