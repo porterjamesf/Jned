@@ -30,7 +30,7 @@ public class KeySetting extends JPanel {
 		sText.setBounds(width/2 - 26, 0, width/2 - 34, height);
 		sText.setForeground(Color.BLACK);
 		add(sText);
-		add(new Buttonwog(mind,"keySetting " + actionNumber,-2,width - 52,2,50,height-4,true,"Change"));
+		add(new Buttonwog(mind,"keySetting#" + actionNumber,-2,width - 52,2,50,height-4,true,"Change"));
 	}
 	
 	//Updates with any changes

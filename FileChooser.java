@@ -66,7 +66,7 @@ public class FileChooser extends JPanel implements DocumentListener {
 		add(makeJLabel("Levels file:",FileChooser.BORDER,ycount,FileChooser.LVLFL_WIDTH,FileChooser.ROW_HEIGHT,1));
 		fileName = makeJLabel(userlevels,FileChooser.LVLFL_WIDTH + 2*FileChooser.BORDER,ycount,FileChooser.WINDOW_WIDTH-4*FileChooser.BORDER-FileChooser.BUTTON_WIDTH-FileChooser.LVLFL_WIDTH,FileChooser.ROW_HEIGHT,-1);
 		add(fileName);
-		add(new Buttonwog(master,"fileChooser fileChange",-2,FileChooser.WINDOW_WIDTH-FileChooser.BORDER-FileChooser.BUTTON_WIDTH,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Change"));
+		add(new Buttonwog(master,"fileChooser#fileChange",-2,FileChooser.WINDOW_WIDTH-FileChooser.BORDER-FileChooser.BUTTON_WIDTH,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Change"));
 		ycount += FileChooser.BORDER + FileChooser.ROW_HEIGHT;
 		
 		//Some math
@@ -76,9 +76,9 @@ public class FileChooser extends JPanel implements DocumentListener {
 		genc = (int)(FileChooser.GENRE * calcedWidth);
 		
 		//Column label buttons
-		add(new Buttonwog(master,"fileChooser lvlName",-2,lvlc + FileChooser.BORDER*2,ycount,FileChooser.BUTTON_WIDTH*2,FileChooser.ROW_HEIGHT,true,"Level Name"));
-		add(new Buttonwog(master,"fileChooser lvlAuthor",-2,authc + FileChooser.BORDER*2,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Author"));
-		add(new Buttonwog(master,"fileChooser lvlGenre",-2,genc + FileChooser.BORDER*2,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Type"));
+		add(new Buttonwog(master,"fileChooser#lvlName",-2,lvlc + FileChooser.BORDER*2,ycount,FileChooser.BUTTON_WIDTH*2,FileChooser.ROW_HEIGHT,true,"Level Name"));
+		add(new Buttonwog(master,"fileChooser#lvlAuthor",-2,authc + FileChooser.BORDER*2,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Author"));
+		add(new Buttonwog(master,"fileChooser#lvlGenre",-2,genc + FileChooser.BORDER*2,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Type"));
 		ycount += FileChooser.BORDER + FileChooser.ROW_HEIGHT;
 		
 		//Scrollpane and level list panel
@@ -120,9 +120,9 @@ public class FileChooser extends JPanel implements DocumentListener {
 		saveY = ycount; //This is the y value to set the save/cancel buttons to when in save mode, or the window height to in open mode
 		
 		//Open/Save and Cancel buttons
-		dothething = new Buttonwog(master,"fileChooser dothething",-2,FileChooser.BORDER,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"");
+		dothething = new Buttonwog(master,"fileChooser#dothething",-2,FileChooser.BORDER,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"");
 		add(dothething);
-		cancel = new Buttonwog(master,"fileChooser cancel",-2,FileChooser.WINDOW_WIDTH-FileChooser.BORDER-FileChooser.BUTTON_WIDTH,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Cancel");
+		cancel = new Buttonwog(master,"fileChooser#cancel",-2,FileChooser.WINDOW_WIDTH-FileChooser.BORDER-FileChooser.BUTTON_WIDTH,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Cancel");
 		add(cancel);
 		ycount += FileChooser.BORDER + FileChooser.ROW_HEIGHT;
 		
@@ -144,8 +144,8 @@ public class FileChooser extends JPanel implements DocumentListener {
 		ycount = FileChooser.BORDER;
 		overwrite.add(makeJLabel("Are you sure you want to overwrite this level?",FileChooser.BORDER,ycount,FileChooser.OVERWRITE_WIDTH-2*FileChooser.BORDER,FileChooser.ROW_HEIGHT,0));
 		ycount += FileChooser.BORDER + FileChooser.ROW_HEIGHT;
-		overwrite.add(new Buttonwog(master,"fileChooser overwriteOK",-2,FileChooser.BORDER,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"OK"));
-		overwrite.add(new Buttonwog(master,"fileChooser overwriteCancel",-2,FileChooser.OVERWRITE_WIDTH-2*FileChooser.BORDER-FileChooser.BUTTON_WIDTH,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Cancel"));
+		overwrite.add(new Buttonwog(master,"fileChooser#overwriteOK",-2,FileChooser.BORDER,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"OK"));
+		overwrite.add(new Buttonwog(master,"fileChooser#overwriteCancel",-2,FileChooser.OVERWRITE_WIDTH-2*FileChooser.BORDER-FileChooser.BUTTON_WIDTH,ycount,FileChooser.BUTTON_WIDTH,FileChooser.ROW_HEIGHT,true,"Cancel"));
 		ycount += FileChooser.BORDER + FileChooser.ROW_HEIGHT;
 		
 		overwrite.setLocationRelativeTo(null);
@@ -355,7 +355,7 @@ public class FileChooser extends JPanel implements DocumentListener {
 	
 
 		public LevelButton(Jned mind, int num, String nom, String auth, String gen, int xpos, int ypos, int width, int height) {
-			super(mind,"fileChooser " + num,-2,xpos,ypos,width,height,true,"");
+			super(mind,"fileChooser#" + num,-2,xpos,ypos,width,height,true,"");
 			name = nom;
 			author = auth;
 			genre = gen;

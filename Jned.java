@@ -131,6 +131,8 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 	private KeySignature keys;
 	private KeyShortcuts keySetWindow;
 	private FileChooser fileChooser;
+	private JMenu	mGridSet,			//Links to the menu bar lists of grid and snap settings, so that they can be dynamically updated.
+					mSnapSet;
 	private JDialog	grSaveDialog,
 					grDeleteDialog,
 					snSaveDialog,
@@ -157,7 +159,7 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		config = new Nfile("config.txt");
 		userlevels = config.getData("fpath");
 		
-		buttons = new Pushable[89];																																				//BUTTON ARRAY SIZE SET
+		buttons = new Pushable[90];																																				//BUTTON ARRAY SIZE SET
 		hist = new History();
 		
 		//Sets up key listener
@@ -880,44 +882,32 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		JMenuBar mbar = new JMenuBar();
 		
 		 JMenu mFile = new JMenu("File");
-		  JMenuItem miNew = new JMenuItem("New");
-		   miNew.addActionListener(this);
-		   miNew.setActionCommand("new");
-		  JMenuItem miOpen = new JMenuItem("Open");
-		   miOpen.addActionListener(this);
-		   miOpen.setActionCommand("open");
-		  JMenuItem miSave = new JMenuItem("Save");
-		   miSave.addActionListener(this);
-		   miSave.setActionCommand("save");
-		  JMenuItem miSaveAs = new JMenuItem("Save As");
-		   miSaveAs.addActionListener(this);
-		   miSaveAs.setActionCommand("saveAs");
-		  JMenuItem miExit = new JMenuItem("Exit");
-		   miExit.addActionListener(this);
-		   miExit.setActionCommand("Exit");
-		 mFile.add(miNew);
-		 mFile.add(miOpen);
-		 mFile.add(miSave);
-		 mFile.add(miSaveAs);
-		 mFile.add(miExit);
+		 mFile.add(makeMenuItem("New","new"));
+		 mFile.add(makeMenuItem("Open","open"));
+		 mFile.add(makeMenuItem("Save","save"));
+		 mFile.add(makeMenuItem("Save As","saveAs"));
+		 mFile.add(makeMenuItem("Exit","Exit"));
 		 
 		 JMenu mEdit = new JMenu("Edit");
-		  JMenuItem miUndo = new JMenuItem("Undo");
-		   miUndo.addActionListener(this);
-		   miUndo.setActionCommand("undo");
-		  JMenuItem miRedo = new JMenuItem("Redo");
-		   miRedo.addActionListener(this);
-		   miRedo.setActionCommand("redo");
-		  JMenuItem miKeys = new JMenuItem("Keyboard Shortcuts");
-		   miKeys.addActionListener(this);
-		   miKeys.setActionCommand("keyShortcuts");
-		 mEdit.add(miUndo);
-		 mEdit.add(miRedo);
-		 mEdit.add(miKeys);
+		 mEdit.add(makeMenuItem("Undo","undo"));
+		 mEdit.add(makeMenuItem("Redo","redo"));
+		 mEdit.add(makeMenuItem("Cut","action#6"));
+		 mEdit.add(makeMenuItem("Copy","action#7"));
+		 mEdit.add(makeMenuItem("Paste","action#8"));
+		 mEdit.add(makeMenuItem("Delete","action#9"));
+		 mEdit.add(makeMenuItem("Select All","action#89"));
+		 mEdit.add(makeMenuItem("Snapping","action#78"));
+		  mSnapSet = new JMenu("Snap setting");
+		  setSnapSettingMenu();
+		 mEdit.add(mSnapSet);
+		 mEdit.add(makeMenuItem("Keyboard Shortcuts","keyShortcuts"));
 		 
 		 JMenu mView = new JMenu("View");
-		  JMenuItem miGrid = new JMenuItem("Grid");
-		 mView.add(miGrid);
+		 mView.add(makeMenuItem("Gridlines","action#75"));
+		  mGridSet = new JMenu("Gridline setting");
+		  setGridlineSettingMenu();
+		 mView.add(mGridSet);
+		 mView.add(makeMenuItem("Snap points","action#81"));
 		 
 		mbar.add(mFile);
 		mbar.add(mEdit);
@@ -937,6 +927,38 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		res.setForeground(Jned.TEXT_COLOR);
 		res.setHorizontalAlignment(align==LEFT?SwingConstants.LEFT:(align==RIGHT?SwingConstants.RIGHT:SwingConstants.CENTER));
 		return res;
+	}
+	private JMenuItem makeMenuItem(String text, String command) {
+		JMenuItem mi = new JMenuItem(text);
+		mi.addActionListener(this);
+		mi.setActionCommand(command);
+		return mi;
+	}
+	
+	//Fills out the grilines settings and snap settings menus for the top menu bar
+	private void setGridlineSettingMenu() {
+		mGridSet.removeAll();
+		for(String nom : config.getNames("grid",1)) {
+			JMenuItem mi = new JMenuItem(nom);
+			mGridSet.add(nom);
+		}
+		for(int i = 0; i < mGridSet.getItemCount(); i++) { //For some reason, this only works when done in a separate loop.
+			JMenuItem mi = mGridSet.getItem(i);
+			mi.addActionListener(this);
+			mi.setActionCommand("gridlineSetting#" + mi.getText());
+		}
+	}
+	private void setSnapSettingMenu() {
+		mSnapSet.removeAll();
+		for(String nom : config.getNames("snap",1)) {
+			JMenuItem mi = new JMenuItem(nom);
+			mSnapSet.add(nom);
+		}
+		for(int i = 0; i < mSnapSet.getItemCount(); i++) {
+			JMenuItem mi = mSnapSet.getItem(i);
+			mi.addActionListener(this);
+			mi.setActionCommand("snapSetting#" + mi.getText());
+		}
 	}
 	//Retrieves an image
 	public BufferedImage img(int index) {
@@ -1114,8 +1136,8 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 					if(lvl.getBoolMode()) lvl.push("paste");
 					else lvl.push("itemPaste");
 					break;
-				case 9: //Testing action (set to CTRL + SHIFT + ~)
-					System.out.println(findNextActionNumber());
+				case 9: //Delete
+					pushDelete();
 					break;
 				case 10: //Selection mode
 					lvl.setMode(-1);
@@ -1227,6 +1249,9 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 				case 88: //New
 					newLevel();
 					break;
+				case 89: //Select All
+					lvl.selectAll();
+				break;
 				default:
 					System.out.println("No action for number " + an);
 					break;
@@ -2268,10 +2293,23 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 			case "keyShortcuts":
 				keySetWindow.open();
 			break;
+			
+			//Other
 			default:
-				String[] multicmd = button.split(" ");
-				if(multicmd.length > 1) {
+				String[] multicmd = button.split("#");
+				if(multicmd.length > 1) { //Testing for commands from the gridline or snap setting menu buttons, keyboard shortcuts dialogs, file chooser dialogs, or action number calls
 					switch(multicmd[0]) {
+						case "action":
+							try { //An alternative way to push buttons. Menu buttons, for example, call actionPerformed, which redirects here. But some need to actually push a physical button, so
+								doActionNumber(Integer.parseInt(multicmd[1])); //this mechanism redirects to an action number, which calls that button's push method, pushing it and redirecting back
+							} catch (NumberFormatException e) {}               //to this method with the actual action command.
+						break;
+						case "gridlineSetting":
+							gridSelect.setSelectedItem(multicmd[1]);
+						break;
+						case "snapSetting":
+							snapSelect.setSelectedItem(multicmd[1]);
+						break;
 						case "keySetting":
 							keys.push(multicmd[1]);
 						break;
@@ -2336,12 +2374,15 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		config.writeNew(name,"grid","" + findNextActionNumber(),data);
 		gridSelect.addItem(name);
 		gridSelect.setSelectedItem(name);
+		setGridlineSettingMenu();
+																																											//Invoke dynamic method in KeyShortcuts
 	}
 	//Deletes a preset from the config file
 	public void deleteGridLines(String name) {
 		if(!name.split(" ")[0].equals("classic")) {
 			config.delete(name);
 			gridSelect.removeItem(name);
+			setGridlineSettingMenu();
 		}
 	}
 	//Loads gridline data from config file
@@ -2359,12 +2400,14 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		config.writeNew(name,"snap","" + findNextActionNumber(),snOverlay.saveData());
 		snapSelect.addItem(name);
 		snapSelect.setSelectedItem(name);
+		setSnapSettingMenu();
 	}
 	//Deletes a preset from the config file
 	public void deleteSnapPoints(String name) {
 		if(!name.split(" ")[0].equals("classic")) {
 			config.delete(name);
 			snapSelect.removeItem(name);
+			setSnapSettingMenu();
 		}
 	}
 	//Loads gridline data from config file

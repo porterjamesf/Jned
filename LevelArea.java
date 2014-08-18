@@ -356,6 +356,23 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 		}
 	}
 	
+	//In selection mode, selects every item or expands tile selection box to whole level
+	public void selectAll() {
+		if(mode==-1) {
+			if(isTiles) {
+				dcol = 30;
+				drow = 22;
+				borderCheck();
+			} else {
+				clearSelection();
+				for(Item it : items) {
+					selection.add(it);
+					it.setSelect(true);
+				}
+			}
+		}
+	}
+	
 	//Copies the currently selected item or items to the item clipboard
 	private void copyItems(boolean cut) {
 		if(selection.size()==0) {
@@ -792,8 +809,9 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 	private void mouseMoveTile (MouseEvent me) {
 		col = (me.getX())/cell;
 		row = (me.getY())/cell;
-		
-		//Border checks - work using magic
+		borderCheck();
+	}
+	private void borderCheck() { //works using magic
 		col -= Math.min(Math.min(0,dcol)+col-1,0) + Math.max(Math.max(0,dcol)+col-31,0);
 		row -= Math.min(Math.min(0,drow)+row-1,0) + Math.max(Math.max(0,drow)+row-23,0);
 	}

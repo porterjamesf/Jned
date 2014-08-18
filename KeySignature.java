@@ -10,11 +10,11 @@ Manages all the keyboard input for Jned. 																												//LEFT OFF 
 
 The array is based on the key code of key events, which range as follows:		
 			0		1		2		3		4		5		6		7		8		9
-0's   -		
+0's   -																		Backspace
 10's  -		Enter			Clear*													Pause/Break			*Clear is the numbpad 5 when num lock is off
 20's  -		Caps lk													Esc
 30's  - 					Space	PageUp	PageDwn	End		Home	Left	Up		Right
-40's  - 	Down	 						,<		-_		.>		/?		0		1
+40's  - 	Down	(bckspc)				,<		-_		.>		/?		0		1
 50's  -		2		3		4		5		6		7		8		9				;:
 60's  -				=+								A		B		C		D		E
 70's  -		F		G		H		I		J		K		L		M		N		O
@@ -31,7 +31,9 @@ The array is based on the key code of key events, which range as follows:
 ...
 220's -						'"
 
-This boils down essentially to a block from 32 to 123, with 5 sparse key codes before it and 7 after. So, a method is used to consolidate that into
+This boils down essentially to a block from 32 to 123, with 5 sparse key codes before it and 7 after. ***Update: the backspace key has been added to the mix
+much later, making 6 sparse key codes before. But, since everything is already set up with the old index values, the backspace key code of 8 is just mapped
+to the previously unused value of 41 (which gets mapped to 21).*** So, a method is used to consolidate that into
 an array of 104 values, with 8 variations of combo keys indexed with binary flags:
 0 -	000 -	none
 1 -	001 -					ALT
@@ -45,7 +47,7 @@ an array of 104 values, with 8 variations of combo keys indexed with binary flag
 The array itself is actually not an array, but a sparse array implemented as a linked list. Each element has its key (the array index as above) and some
 arbitrary number of action values in an ArrayList (since some keys need to have multiple functions in different contexts).
 
-For the this list of action numbers, see the method getActionText(int actionNumber) below.
+For the list of action numbers, see the method getActionText(int actionNumber) below.
 */
 
 import java.awt.event.*;
@@ -175,8 +177,8 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 		removes = new Buttonwog[0];
 		replaces = new Buttonwog[0];
 		
-		kcdAdd = new Buttonwog(mind,"keySetting add",-2,KeySignature.KCD_BORDER, KeySignature.KCD_BORDER*2 + KeySignature.KCD_ROW_HEIGHT, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Add...");
-		kcdClose = new Buttonwog(mind,"keySetting close",-2,KeySignature.KCD_WIDTH/2-KeySignature.KCD_BUTTON_WIDTH/2, KeySignature.KCD_BORDER*3 + KeySignature.KCD_ROW_HEIGHT*2, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Close");
+		kcdAdd = new Buttonwog(mind,"keySetting#add",-2,KeySignature.KCD_BORDER, KeySignature.KCD_BORDER*2 + KeySignature.KCD_ROW_HEIGHT, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Add...");
+		kcdClose = new Buttonwog(mind,"keySetting#close",-2,KeySignature.KCD_WIDTH/2-KeySignature.KCD_BUTTON_WIDTH/2, KeySignature.KCD_BORDER*3 + KeySignature.KCD_ROW_HEIGHT*2, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Close");
 		keyChange.add(kcdAdd);
 		keyChange.add(kcdClose);
 		
@@ -209,11 +211,11 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 				keyChange.add(keyNames[i]);
 				xcount += KeySignature.KCD_KEYNAME_WIDTH + KeySignature.KCD_BORDER;
 				//Rename button
-				removes[i] = new Buttonwog(mind,"keySetting rm," + i,-2, xcount, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Remove");
+				removes[i] = new Buttonwog(mind,"keySetting#rm," + i,-2, xcount, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Remove");
 				keyChange.add(removes[i]);
 				xcount += KeySignature.KCD_BUTTON_WIDTH + KeySignature.KCD_BORDER;
 				//Replace button
-				replaces[i] = new Buttonwog(mind,"keySetting rp," + i,-2, xcount, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Replace");
+				replaces[i] = new Buttonwog(mind,"keySetting#rp," + i,-2, xcount, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Replace");
 				keyChange.add(replaces[i]);
 				
 				ycount += KeySignature.KCD_ROW_HEIGHT + 1;
@@ -250,8 +252,8 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 		cldNewAct.setBounds(KeySignature.KCD_BORDER,ycount,KeySignature.CLD_WIDTH-2*KeySignature.KCD_BORDER,KeySignature.KCD_ROW_HEIGHT);
 		ycount += KeySignature.KCD_BORDER + KeySignature.KCD_ROW_HEIGHT;
 		
-		cldOk = new Buttonwog(mind,"keySetting cldOk",-2,KeySignature.KCD_BORDER, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"OK");
-		cldCancel = new Buttonwog(mind,"keySetting cldCancel",-2,KeySignature.CLD_WIDTH-KeySignature.KCD_BORDER-KeySignature.KCD_BUTTON_WIDTH, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Cancel");
+		cldOk = new Buttonwog(mind,"keySetting#cldOk",-2,KeySignature.KCD_BORDER, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"OK");
+		cldCancel = new Buttonwog(mind,"keySetting#cldCancel",-2,KeySignature.CLD_WIDTH-KeySignature.KCD_BORDER-KeySignature.KCD_BUTTON_WIDTH, ycount, KeySignature.KCD_BUTTON_WIDTH, KeySignature.KCD_ROW_HEIGHT,true,"Cancel");
 		ycount += KeySignature.KCD_BORDER + KeySignature.KCD_ROW_HEIGHT;
 		
 		keyCol.add(cldKey);
@@ -275,6 +277,7 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 	private int convertKeyCode(int kc) {
 		if(kc < 32 || kc > 123) {
 			switch(kc) {
+				case 8: return 21;		//Backspace
 				case 10: return 0;		//Enter
 				case 12: return 1;		//Clear
 				case 19: return 2;		//Pause/break
@@ -312,6 +315,7 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 				default: return -1;
 			}
 		}
+		if(ki==21) return 8;			//Backspace
 		return ki + 20;					//All the rest, with 12 being mapped to 32 (space), up through 103 being mapped to 123 (F12).
 	}
 	
@@ -380,6 +384,7 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 						break;
 					}
 				} else {
+					if(val == 9) mind.backsp = press;
 					if(press) mind.doActionNumber(val);
 				}
 			}
@@ -401,10 +406,6 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 				mind.alt = true;
 				modKeyFlags |= 0b001;
 			break;
-			case KeyEvent.VK_BACK_SPACE:
-				mind.backsp = true;
-				mind.pushDelete();
-			break;
 			default:
 				doActions(104*modKeyFlags + convertKeyCode(ke.getKeyCode()),true);
 			break;
@@ -425,11 +426,8 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 				mind.alt = false;
 				modKeyFlags &= 0b110;
 			break;
-			case KeyEvent.VK_BACK_SPACE:
-				mind.backsp = false;
-			break;
 			default:
-				doActions(104*modKeyFlags + convertKeyCode(ke.getKeyCode()),false); //This method call is simply checking for the 4 object direction keys, to lift them if they are pressed
+				doActions(104*modKeyFlags + convertKeyCode(ke.getKeyCode()),false); //This method call is simply checking for the 4 object direction keys or delete key, to lift them if they are pressed
 			break;
 		}
 		mind.repaint();
@@ -442,6 +440,7 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 		These are the action numbers for Jned. In the Jned file, they are used as indices in the array of buttons whenever an action has a 1:1 correspondance with a button press. 
 		Other than that, they are simply individually mapped to different actionCommand strings by the doActionNumber method (also in Jned)
 		*/
+		//After adding a new action, update the size of the button array in Jned (near top of constructor, line ~165) and number of key setting objects in KeyShortcuts (under KeySettings section of constructor, line ~65)
 		switch(action) {
 			case 0: return "No action";
 			case 1: return "tiles mode";
@@ -452,7 +451,7 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 			case 6: return "cut";
 			case 7: return "copy";
 			case 8: return "paste";
-			case 9: return "Test action";
+			case 9: return "delete";
 			case 10: return "none";
 			
 			//TILES MODE ONLY
@@ -548,6 +547,7 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 			case 87: return "put text-box on right side";
 			
 			case 88: return "new";
+			case 89: return "select all";
 			
 			default:
 				if(action >= 256) {	//	Grid and snap presets
@@ -775,8 +775,6 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 				break;
 				case KeyEvent.VK_ALT:
 					dialogMKF |= 0b001;
-				break;
-				case KeyEvent.VK_BACK_SPACE:
 				break;
 				default:
 					if(listening) {

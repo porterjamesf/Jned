@@ -46,9 +46,9 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 		 keySelect.addActionListener(this);
 		add(keySelect);
 		xcount += KeyShortcuts.BORDER*2 + 102;
-		add(new Buttonwog(mind,"keyShortcuts saveOpen",-2,xcount, ycount, 102, KeyShortcuts.ROW_HEIGHT,true,"Save"));
+		add(new Buttonwog(mind,"keyShortcuts#saveOpen",-2,xcount, ycount, 102, KeyShortcuts.ROW_HEIGHT,true,"Save"));
 		xcount += 102 + KeyShortcuts.BORDER;
-		add(new Buttonwog(mind,"keyShortcuts deleteOpen",-2,xcount, ycount, 102, KeyShortcuts.ROW_HEIGHT,true,"Delete"));
+		add(new Buttonwog(mind,"keyShortcuts#deleteOpen",-2,xcount, ycount, 102, KeyShortcuts.ROW_HEIGHT,true,"Delete"));
 		
 		//Column labels
 		ycount += KeyShortcuts.BORDER + KeyShortcuts.ROW_HEIGHT;
@@ -59,8 +59,8 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 		//KeySettings
 		ycount += KeyShortcuts.BORDER + KeyShortcuts.ROW_HEIGHT;
 		xcount = KeyShortcuts.WINDOW_WIDTH - 2*KeyShortcuts.BORDER - 8;
-		for(int i = 1; i < 88; i++) {																																					//--------NUMBER OF KEY SETTING OBJECTS
-			if(i==9 || i==30 || i==40) i++; //Action numbers not used
+		for(int i = 1; i < 90; i++) {																																					//--------NUMBER OF KEY SETTING OBJECTS
+			if(i==30 || i==40) i++; //Action numbers not used
 			if(i>=49 && i <= 52) i=53; //Diagonal direction actions - combinations of directional actions 45-48
 			if(i==10) {
 				add(makeJLabel("Left button column",KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, -1));
@@ -76,7 +76,7 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 			add(new KeySetting(mind, fFlat, KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, i));
 			ycount += KeyShortcuts.ROW_HEIGHT + 1;
 		}
-		add(makeJLabel("Gridline settings",KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, -1));
+		add(makeJLabel("Gridline settings",KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, -1));																		//Place this section in own method, make dynamic
 		ycount += KeyShortcuts.ROW_HEIGHT + 1;
 		String[] setting = config.getNames("grid",1);
 		for(String set : setting) {
@@ -134,8 +134,8 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 		saveText.addActionListener(this);
 		saveDialog.add(saveText);
 		ycount += KeyShortcuts.BORDER + KeyShortcuts.ROW_HEIGHT;
-		saveDialog.add(new Buttonwog(mind,"keyShortcuts save",-2,KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Save"));
-		saveDialog.add(new Buttonwog(mind,"keyShortcuts saveCancel",-2,KeyShortcuts.DIALOG_WIDTH-KeyShortcuts.BUTTON_WIDTH-KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Cancel"));
+		saveDialog.add(new Buttonwog(mind,"keyShortcuts#save",-2,KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Save"));
+		saveDialog.add(new Buttonwog(mind,"keyShortcuts#saveCancel",-2,KeyShortcuts.DIALOG_WIDTH-KeyShortcuts.BUTTON_WIDTH-KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Cancel"));
 		ycount += KeyShortcuts.BORDER + KeyShortcuts.ROW_HEIGHT;
 		
 		saveDialog.setLocationRelativeTo(null);
@@ -150,8 +150,8 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 		int ycount = KeyShortcuts.BORDER;
 		deleteDialog.add(makeJLabel("Are you sure you want to delete this preset?",KeyShortcuts.BORDER,ycount,KeyShortcuts.DIALOG_WIDTH-2*KeyShortcuts.BORDER,KeyShortcuts.ROW_HEIGHT,0));
 		ycount += KeyShortcuts.BORDER + KeyShortcuts.ROW_HEIGHT;
-		deleteDialog.add(new Buttonwog(mind,"keyShortcuts delete",-2,KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Delete"));
-		deleteDialog.add(new Buttonwog(mind,"keyShortcuts deleteCancel",-2,KeyShortcuts.DIALOG_WIDTH-KeyShortcuts.BUTTON_WIDTH-KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Cancel"));
+		deleteDialog.add(new Buttonwog(mind,"keyShortcuts#delete",-2,KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Delete"));
+		deleteDialog.add(new Buttonwog(mind,"keyShortcuts#deleteCancel",-2,KeyShortcuts.DIALOG_WIDTH-KeyShortcuts.BUTTON_WIDTH-KeyShortcuts.BORDER,ycount,KeyShortcuts.BUTTON_WIDTH,KeyShortcuts.ROW_HEIGHT,true,"Cancel"));
 		ycount += KeyShortcuts.BORDER + KeyShortcuts.ROW_HEIGHT;
 		
 		deleteDialog.setLocationRelativeTo(null);
