@@ -179,7 +179,12 @@ public class FileChooser extends JPanel implements DocumentListener {
 			add(lvlAuthor);
 			add(lblGenre);
 			add(lvlGenre);
+			String [] atts = master.getAttributes();
+			lvlName.setText(atts[0]);
+			lvlAuthor.setText(atts[1]);
+			lvlGenre.setText(atts[2]);
 			dothething.setLocation(FileChooser.BORDER,saveY);
+			dothething.enableButton();
 			cancel.setLocation(FileChooser.WINDOW_WIDTH-FileChooser.BORDER-FileChooser.BUTTON_WIDTH,saveY);
 			setPreferredSize(new Dimension(FileChooser.WINDOW_WIDTH,savePlus));
 		} else {
@@ -231,10 +236,11 @@ public class FileChooser extends JPanel implements DocumentListener {
 						}
 					} else {
 						Nfile usrlvls = new Nfile(userlevels);
-						master.updateText(usrlvls.getData(lvlButtons[selection].name)); //Places the selected level's data into the text box
+						master.loadLevel(lvlButtons[selection].name,lvlButtons[selection].author,lvlButtons[selection].genre,usrlvls.getData(lvlButtons[selection].name));
+						//master.updateText(usrlvls.getData(lvlButtons[selection].name)); //Places the selected level's data into the text box
 						usrlvls.close();
-						master.push("tboxlvl");											//Loads the text box data to the level area, just as if you'd pushed 'Load text'
-						master.setAttributes(lvlButtons[selection].name,lvlButtons[selection].author,lvlButtons[selection].genre);
+						//master.push("tboxlvl");											//Loads the text box data to the level area, just as if you'd pushed 'Load text'
+						//master.setAttributes(lvlButtons[selection].name,lvlButtons[selection].author,lvlButtons[selection].genre);
 						master.savedAs = true;
 					}
 					//Intentional continuation into next case
@@ -245,6 +251,7 @@ public class FileChooser extends JPanel implements DocumentListener {
 					int result = fchooser.showOpenDialog(frame);
 					if(result == JFileChooser.APPROVE_OPTION) {
 						userlevels = fchooser.getSelectedFile().getPath();
+						if(userlevels.indexOf(".txt")==-1) userlevels += ".txt";
 						master.setUserlevels(userlevels);
 						fileName.setText(userlevels);
 						populateList();

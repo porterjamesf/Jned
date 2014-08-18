@@ -16,6 +16,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
 import java.nio.ByteBuffer;
 import java.io.IOException;
+import java.io.File;
 import java.awt.Rectangle;
 import java.nio.charset.Charset;
 
@@ -37,10 +38,26 @@ public class Nfile {
 				buf = ByteBuffer.allocate(BUFFER_SIZE);
 				scan();
 			} catch (IOException ioe) {
+				System.out.println("IO exception opening " + path);
 				close();
 			}
 		} else {
-			System.out.println("Could not find file: " + path);
+			//System.out.println("Could not find file: " + path + "\nCreating new file.");
+			try {
+				File lvlFile = new File(spath);
+				if(lvlFile.createNewFile()) {
+					bc = Files.newByteChannel(path, new OpenOption[] {StandardOpenOption.READ, StandardOpenOption.WRITE});
+					buf = ByteBuffer.allocate(BUFFER_SIZE);
+					scan();	//The first scan initializes values so that the write operation will work
+					write("Jned local user levels storage \n&\n",(int)bc.size(),(int)bc.size());
+					scan(); //The second scan re-initializes with the ampersand in place, so that subsequent writing of level entries will work properly
+				} else {
+					System.out.println("Creation of " + path + " failed.");
+				}
+			} catch (IOException ioe) {
+				System.out.println("IO exception creating " + path + ": \n" + ioe);
+				close();
+			}
 		}
 	}
 	//Scans through the file and fills out internal arrays of data for entries

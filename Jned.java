@@ -78,6 +78,7 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 								LEFT = -1,
 								CENTER = 0,
 								RIGHT = 1;
+	public static final String	BLANK_LEVEL = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000|";
 						
 	public final int	BORDER = 4,						//Width of padding border on interface panels
 						SHORT_BUTTON_HT = 24,			//Height of the short buttons
@@ -134,6 +135,9 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 					grDeleteDialog,
 					snSaveDialog,
 					snDeleteDialog;
+	protected String	lvlName,
+						lvlAuthor,
+						lvlGenre;
 	
 	//Constructor: first operation at start of application - sets up entire display, including interface menus and buttons, work area, and text editor
 	public Jned (JFrame fred) {
@@ -146,12 +150,14 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		itemdir = 0;
 		dronebeh = 1;
 		drawTriggers = drawPaths = savedAs = false;
+		lvlName = lvlAuthor = lvlGenre = "";
+		freddy.setTitle("New level");
 		
 		imgBank = new ImageBank();
 		config = new Nfile("config.txt");
 		userlevels = config.getData("fpath");
 		
-		buttons = new Pushable[88];																																				//BUTTON ARRAY SIZE SET
+		buttons = new Pushable[89];																																				//BUTTON ARRAY SIZE SET
 		hist = new History();
 		
 		//Sets up key listener
@@ -876,7 +882,7 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		 JMenu mFile = new JMenu("File");
 		  JMenuItem miNew = new JMenuItem("New");
 		   miNew.addActionListener(this);
-		   miNew.setActionCommand("New");
+		   miNew.setActionCommand("new");
 		  JMenuItem miOpen = new JMenuItem("Open");
 		   miOpen.addActionListener(this);
 		   miOpen.setActionCommand("open");
@@ -970,6 +976,23 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 			hist.add(text);
 		}
 	}
+	
+	//Loads a level, including level attributes
+	public void loadLevel(String name, String author, String genre, String data) {
+		setAttributes(name, author, genre);
+		updateText(data);
+		push("tboxlvl");
+		hist.clear();
+	}
+	//Starts a new level
+	public void newLevel() {
+		setAttributes("","","");
+		updateText(Jned.BLANK_LEVEL);
+		push("tboxlvl");
+		hist.clear();
+		freddy.setTitle("New level");
+		savedAs = false;
+	}
 	//Highlights an item in the text box, given the starting index of its text
 	public void highlightItem(int index) {
 		tbox.highlightItem(index);
@@ -987,7 +1010,17 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		}
 	}
 	public void setAttributes(String name, String author, String genre) {
-		lvl.setAttributes(name, author, genre);
+		lvlName = name;
+		lvlAuthor = author;
+		lvlGenre = genre;
+		freddy.setTitle(name + " - " + author + " - " + genre);
+	}
+	public String[] getAttributes() {
+		String[] res = new String[3];
+		res[0] = lvlName;
+		res[1] = lvlAuthor;
+		res[2] = lvlGenre;
+		return res;
 	}
 	
 	//Makes a button group out of an array of buttons. Set isRadio to true if you want the group to always have one option pushed
@@ -1190,6 +1223,9 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 					break;
 				case 87: //Push text beside	
 					pushTextBeside();
+					break;
+				case 88: //New
+					newLevel();
 					break;
 				default:
 					System.out.println("No action for number " + an);
@@ -2211,10 +2247,13 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 				break;
 				
 			//Menu bar
+			case "new":
+				newLevel();
+			break;
 			case "save":
 				if(savedAs) {
 					Nfile usrlvls = new Nfile(userlevels);
-					usrlvls.setData(tbox.getText(),lvl.getAttributes()[0]);
+					usrlvls.setData(tbox.getText(),lvlName);
 					usrlvls.close();
 				} else {
 					fileChooser.open(true);

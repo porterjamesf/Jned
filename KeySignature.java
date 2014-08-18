@@ -547,6 +547,8 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 			case 86: return "put text-box below window";
 			case 87: return "put text-box on right side";
 			
+			case 88: return "new";
+			
 			default:
 				if(action >= 256) {	//	Grid and snap presets
 					String[] setting = config.getNames(("" + action),2);

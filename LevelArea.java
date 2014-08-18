@@ -55,9 +55,6 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 	private JPopupMenu	cpypst,		//The drop-down menu that allows the user to copy or paste tile blocks in tile selection mode
 						itemMenu;	//The drop_down menu that appears when you right-click on an item, or right-click with items selected
 	private JMenuItem[]	menuItems;	//An array of the different options that can appear on the itemMenu drop-down menu.
-	protected String	lvlName,
-						lvlAuthor,
-						lvlGenre;
 	
 	//private TextBox tbox;		//Link to the text area of Jned
 	
@@ -91,7 +88,6 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 		col = row = dcol = drow = itClX = itClY = buttonDown = 0;
 		mode = thePlayer = -1;
 		swtch = false;
-		lvlName = lvlAuthor = lvlGenre = "";
 		
 		tiles = new int[31][23];
 		items = new ArrayList<Item>();
@@ -541,10 +537,10 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 		}
 		return result + things;
 	}
-	public void inputLevel(String name, String author, String genre, String data) {
+	/*public void inputLevel(String name, String author, String genre, String data) {
 		setAttributes(name,author,genre);
 		inputLevel(data);
-	}
+	}*/
 	public void inputLevel(String data) { //Edits level data to match a string in n editor format
 		String valchars = new String(charvals);
 		//Tiles
@@ -650,15 +646,6 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 		mind.updateText(outputLevel()); //Called simply to update the item indices array
 		chDronePaths();
 		calcDronePaths();
-	}
-	public String[] getAttributes() {
-		String[] res = {lvlName, lvlAuthor, lvlGenre};
-		return res;
-	}
-	public void setAttributes(String name, String author, String genre) {
-		lvlName = name;
-		lvlAuthor = author;
-		lvlGenre = genre;
 	}
 	
 	//Interface methods
