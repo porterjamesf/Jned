@@ -14,8 +14,10 @@ public class KeySetting extends JPanel {
 	protected int actionNumber;
 	private JLabel	aText,
 					sText;
+	private JMenuItem soulmate;
 	
 	public KeySetting(Jned mind, KeySignature lord, int xpos, int ypos, int width, int height, int actionNum) {
+		soulmate = null;
 		setLayout(null);
 		master = lord;
 		master.register(this);
@@ -38,6 +40,21 @@ public class KeySetting extends JPanel {
 		aText.setText(master.getActionText(actionNumber));
 		sText.setText(master.getKeyText(actionNumber));
 		repaint();
+		
+		//Update soulmate menu item key text
+		if(soulmate != null) {
+			KeyStroke tap = master.getKeyStroke(actionNumber);
+			soulmate.setAccelerator(tap);
+			soulmate.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(tap,"none");
+		}
 	}
 	
+	//Registers a menu item representing the same action
+	public void setSoulmate(JMenuItem mi) {
+		soulmate = mi;
+		refresh();
+	}
+	public JMenuItem getSoulMate() {
+		return soulmate;
+	}
 }

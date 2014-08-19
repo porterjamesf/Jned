@@ -602,6 +602,28 @@ public class KeySignature implements KeyListener/*, ActionListener*/ {
 		if((mkf & 0b001) > 0) res += "ALT ";
 		return res + KeyEvent.getKeyText(convertKeyIndex(keyIndex%104));
 	}
+	//Returns a KeyStroke object for the given action number
+	public KeyStroke getKeyStroke(int action) {
+		SparseArrayNode node = findNode(actionIndicesHead, action);
+		if(node.key != action) {
+			return null;
+		}
+		int keyIndex = node.values.get(node.values.size()-1); //Only the most recent key added is returned
+		int mkf = keyIndex/104;
+		int modifiers = 0;
+		if((mkf & 0b100) > 0) modifiers |= InputEvent.CTRL_MASK;
+		if((mkf & 0b010) > 0) modifiers |= InputEvent.SHIFT_MASK;
+		if((mkf & 0b001) > 0) modifiers |= InputEvent.ALT_MASK;
+		return KeyStroke.getKeyStroke(convertKeyIndex(keyIndex%104),modifiers,true);
+	}
+	
+	//Returns the KeySetting object corresponding to a given action number
+	public KeySetting getKeySetting(int action) {
+		for(KeySetting ks : settings) {
+			if(ks.actionNumber == action) return ks;
+		}
+		return null;
+	}
 	
 	//Listener methods for the change buttons in KeySetting panels and buttons on the key change dialog
 	public void push(String com) {

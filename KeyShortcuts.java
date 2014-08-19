@@ -26,7 +26,10 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 	private JDialog saveDialog,
 					deleteDialog;
 	private JTextField saveText;
-	private boolean freeze;			//Essentially a lock-out variable, to prevent code calls for setting the combo box from triggering a change in settings, like clicking on it should
+	private boolean freeze;							//Essentially a lock-out variable, to prevent code calls for setting the combo box from triggering a change in settings, like clicking on it should
+	private int	gridlinesYPos;						//The y position in the scroll pane where the gridlines key settings begin. Stored for dynamic reloading
+	private KeySetting[] gridSnapKeySettings;		//The grid and snap key settings. Stored so that they can be dynamically removed and added again
+	private JLabel snapLabel;						//Link to "Snap settings" label, because it too needs to be removed and readded
 	
 	public KeyShortcuts (Jned blown, JFrame fred, KeySignature bSharp, Nfile configurator) {
 		mind = blown;
@@ -78,23 +81,8 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 		}
 		add(makeJLabel("Gridline settings",KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, -1));																		//Place this section in own method, make dynamic
 		ycount += KeyShortcuts.ROW_HEIGHT + 1;
-		String[] setting = config.getNames("grid",1);
-		for(String set : setting) {
-			try {
-				add(new KeySetting(mind, fFlat, KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, Integer.parseInt(config.getAttr2(set))));
-				ycount += KeyShortcuts.ROW_HEIGHT + 1;
-			} catch (NumberFormatException ex) {}
-		}
-		add(makeJLabel("Snap settings",KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, -1));
-		ycount += KeyShortcuts.ROW_HEIGHT + 1;
-		setting = config.getNames("snap",1);
-		for(String set : setting) {
-			try {
-				add(new KeySetting(mind, fFlat, KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, Integer.parseInt(config.getAttr2(set))));
-				ycount += KeyShortcuts.ROW_HEIGHT + 1;
-			} catch (NumberFormatException ex) {}
-		}
-		setPreferredSize(new Dimension(KeyShortcuts.WINDOW_WIDTH, ycount));
+		gridlinesYPos = ycount;
+		addGridSnapSettings();
 		
 		//Dialog and scrollbar setup
 		frame = new JDialog(fred,"Keyboard Shortcuts");
@@ -116,6 +104,38 @@ public class KeyShortcuts extends JPanel implements ActionListener {
 		lbl.setBounds(xpos, ypos, wid, hei);
 		lbl.setForeground(Color.BLACK);
 		return lbl;
+	}
+	//Sets up gridlines and snap settings portion
+	public void addGridSnapSettings() {
+		if(gridSnapKeySettings!=null) {
+			for(KeySetting ks : gridSnapKeySettings) {
+				remove(ks);
+			}
+			remove(snapLabel);
+		}
+		String[] gridSettings = config.getNames("grid",1);
+		String[] snapSettings = config.getNames("snap",1);
+		gridSnapKeySettings = new KeySetting[gridSettings.length+snapSettings.length];
+		int ycount = gridlinesYPos;
+		int xcount = KeyShortcuts.WINDOW_WIDTH - 2*KeyShortcuts.BORDER - 8;
+		for(int i = 0; i < gridSettings.length; i++) {
+			try {
+				gridSnapKeySettings[i] = new KeySetting(mind, fFlat, KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, Integer.parseInt(config.getAttr2(gridSettings[i])));
+				add(gridSnapKeySettings[i]);
+				ycount += KeyShortcuts.ROW_HEIGHT + 1;
+			} catch (NumberFormatException ex) {}
+		}
+		snapLabel = makeJLabel("Snap settings",KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, -1);
+		add(snapLabel);
+		ycount += KeyShortcuts.ROW_HEIGHT + 1;
+		for(int i = 0; i < snapSettings.length; i++) {
+			try {
+				gridSnapKeySettings[i+gridSettings.length] = new KeySetting(mind, fFlat, KeyShortcuts.BORDER, ycount, xcount, KeyShortcuts.ROW_HEIGHT, Integer.parseInt(config.getAttr2(snapSettings[i])));
+				add(gridSnapKeySettings[i+gridSettings.length]);
+				ycount += KeyShortcuts.ROW_HEIGHT + 1;
+			} catch (NumberFormatException ex) {}
+		}
+		setPreferredSize(new Dimension(KeyShortcuts.WINDOW_WIDTH, ycount));
 	}
 	
 	//Sets up the key shortcut preset saving/removing dialogs

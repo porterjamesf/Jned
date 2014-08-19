@@ -882,25 +882,33 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		JMenuBar mbar = new JMenuBar();
 		
 		 JMenu mFile = new JMenu("File");
-		 mFile.add(makeMenuItem("New","new"));
-		 mFile.add(makeMenuItem("Open","open"));
-		 mFile.add(makeMenuItem("Save","save"));
-		 mFile.add(makeMenuItem("Save As","saveAs"));
-		 mFile.add(makeMenuItem("Exit","Exit"));
+		 mFile.add(makeMenuItem("New","action#88"));
+		 mFile.add(makeMenuItem("Open...","action#84"));
+		 mFile.add(makeMenuItem("Save","action#82"));
+		 mFile.add(makeMenuItem("Save As...","action#83"));
+		 mFile.addSeparator();
+		 JMenuItem miExit = makeMenuItem("Exit","Exit"); //This item's keyboard shortcut text needs to be set manually, since the key command is done by the environement and not Jned
+		  KeyStroke altf4 = KeyStroke.getKeyStroke(KeyEvent.VK_F4,InputEvent.ALT_MASK,true);
+		  miExit.setAccelerator(altf4);
+		  miExit.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(altf4,"none");
+		 mFile.add(miExit);
 		 
 		 JMenu mEdit = new JMenu("Edit");
-		 mEdit.add(makeMenuItem("Undo","undo"));
-		 mEdit.add(makeMenuItem("Redo","redo"));
+		 mEdit.add(makeMenuItem("Undo","action#4"));
+		 mEdit.add(makeMenuItem("Redo","action#5"));
+		 mEdit.addSeparator();
 		 mEdit.add(makeMenuItem("Cut","action#6"));
 		 mEdit.add(makeMenuItem("Copy","action#7"));
 		 mEdit.add(makeMenuItem("Paste","action#8"));
 		 mEdit.add(makeMenuItem("Delete","action#9"));
 		 mEdit.add(makeMenuItem("Select All","action#89"));
+		 mEdit.addSeparator();
 		 mEdit.add(makeMenuItem("Snapping","action#78"));
 		  mSnapSet = new JMenu("Snap setting");
 		  setSnapSettingMenu();
 		 mEdit.add(mSnapSet);
-		 mEdit.add(makeMenuItem("Keyboard Shortcuts","keyShortcuts"));
+		 mEdit.addSeparator();
+		 mEdit.add(makeMenuItem("Keyboard Shortcuts...","keyShortcuts"));
 		 
 		 JMenu mView = new JMenu("View");
 		 mView.add(makeMenuItem("Gridlines","action#75"));
@@ -932,6 +940,15 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		JMenuItem mi = new JMenuItem(text);
 		mi.addActionListener(this);
 		mi.setActionCommand(command);
+		
+		String[] multicmd = command.split("#");
+		if(multicmd.length > 1) {					//Menu items that correspond to actions are automatically linked to that action #'s KeySetting object
+			if(multicmd[0].equals("action")) {
+				try {
+					keys.getKeySetting(Integer.parseInt(multicmd[1])).setSoulmate(mi);
+				} catch (NumberFormatException e) {}
+			}
+		}
 		return mi;
 	}
 	
@@ -945,7 +962,11 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		for(int i = 0; i < mGridSet.getItemCount(); i++) { //For some reason, this only works when done in a separate loop.
 			JMenuItem mi = mGridSet.getItem(i);
 			mi.addActionListener(this);
-			mi.setActionCommand("gridlineSetting#" + mi.getText());
+			try {
+				int actionNumber = Integer.parseInt(config.getAttr2(mi.getText()));
+				mi.setActionCommand("action#" + actionNumber);
+				keys.getKeySetting(actionNumber).setSoulmate(mi);
+			} catch (NumberFormatException e) {}
 		}
 	}
 	private void setSnapSettingMenu() {
@@ -957,7 +978,11 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		for(int i = 0; i < mSnapSet.getItemCount(); i++) {
 			JMenuItem mi = mSnapSet.getItem(i);
 			mi.addActionListener(this);
-			mi.setActionCommand("snapSetting#" + mi.getText());
+			try {
+				int actionNumber = Integer.parseInt(config.getAttr2(mi.getText()));
+				mi.setActionCommand("action#" + actionNumber);
+				keys.getKeySetting(actionNumber).setSoulmate(mi);
+			} catch (NumberFormatException e) {}
 		}
 	}
 	//Retrieves an image
@@ -2374,14 +2399,15 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		config.writeNew(name,"grid","" + findNextActionNumber(),data);
 		gridSelect.addItem(name);
 		gridSelect.setSelectedItem(name);
+		keySetWindow.addGridSnapSettings();
 		setGridlineSettingMenu();
-																																											//Invoke dynamic method in KeyShortcuts
 	}
 	//Deletes a preset from the config file
 	public void deleteGridLines(String name) {
 		if(!name.split(" ")[0].equals("classic")) {
 			config.delete(name);
 			gridSelect.removeItem(name);
+			keySetWindow.addGridSnapSettings();
 			setGridlineSettingMenu();
 		}
 	}
@@ -2400,6 +2426,7 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		config.writeNew(name,"snap","" + findNextActionNumber(),snOverlay.saveData());
 		snapSelect.addItem(name);
 		snapSelect.setSelectedItem(name);
+		keySetWindow.addGridSnapSettings();
 		setSnapSettingMenu();
 	}
 	//Deletes a preset from the config file
@@ -2407,6 +2434,7 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		if(!name.split(" ")[0].equals("classic")) {
 			config.delete(name);
 			snapSelect.removeItem(name);
+			keySetWindow.addGridSnapSettings();
 			setSnapSettingMenu();
 		}
 	}
