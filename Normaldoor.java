@@ -52,6 +52,7 @@ public class Normaldoor extends Door {
 	public void moveTo(int xpos, int ypos) {
 		row = xpos/24;
 		col = ypos/24;
+		setItemCoordinates();
 		calcShape();
 		mind.calcDronePaths();
 	}
@@ -60,8 +61,19 @@ public class Normaldoor extends Door {
 	public void moveRelative(int xpos, int ypos) {
 		row = (xpos-deltaRow)/24;
 		col = (ypos-deltaCol)/24;
+		setItemCoordinates();
 		calcShape();
 		mind.calcDronePaths();
+	}
+	
+	public void setDirection(int direc) {
+		super.setDirection(direc);
+		setItemCoordinates();
+	}
+	
+	//Updates the xorig/yorig values in Item, so the door paints in the correct location
+	private void setItemCoordinates() {
+		super.moveTo(24*row+(getDirection()==0?24:(getDirection()==2?0:12)),24*col+(getDirection()==1?24:(getDirection()==3?0:12)));
 	}
 	
 	public void setSelect(boolean select) {
@@ -126,6 +138,5 @@ public class Normaldoor extends Door {
 				g.fillPolygon(xs3,ys3,4);
 			break;
 		}
-		
 	}	
 }

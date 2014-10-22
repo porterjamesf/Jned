@@ -102,12 +102,12 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 		
 		//Tile copy/paste drop-down menu
 		cpypst = new JPopupMenu();
-		 JMenuItem miCopy = new JMenuItem("Copy");
-		  miCopy.addActionListener(this);
-		  miCopy.setActionCommand("copy");
 		 JMenuItem miCut = new JMenuItem("Cut");
 		  miCut.addActionListener(this);
 		  miCut.setActionCommand("cut");
+		 JMenuItem miCopy = new JMenuItem("Copy");
+		  miCopy.addActionListener(this);
+		  miCopy.setActionCommand("copy");
 		 JMenuItem miPaste = new JMenuItem("Paste");
 		  miPaste.addActionListener(this);
 		  miPaste.setActionCommand("paste");
@@ -117,8 +117,8 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 		 JMenuItem miFill = new JMenuItem("Fill");
 		  miFill.addActionListener(this);
 		  miFill.setActionCommand("fill");
-		cpypst.add(miCopy);
 		cpypst.add(miCut);
+		cpypst.add(miCopy);
 		cpypst.add(miPaste);
 		cpypst.add(miErase);
 		cpypst.add(miFill);
@@ -126,12 +126,12 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 		//Item drop-down menu
 		menuItems = new JMenuItem[11];
 		itemMenu = new JPopupMenu();
-		menuItems[0] = new JMenuItem("Copy");
+		menuItems[0] = new JMenuItem("Cut");
 		 menuItems[0].addActionListener(this);
-		 menuItems[0].setActionCommand("itemCopy");
-		menuItems[1] = new JMenuItem("Cut");
+		 menuItems[0].setActionCommand("itemCut");
+		menuItems[1] = new JMenuItem("Copy");
 		 menuItems[1].addActionListener(this);
-		 menuItems[1].setActionCommand("itemCut");
+		 menuItems[1].setActionCommand("itemCopy");
 		menuItems[2] = new JMenuItem("Paste");
 		 menuItems[2].addActionListener(this);
 		 menuItems[2].setActionCommand("itemPaste");
@@ -690,7 +690,7 @@ public class LevelArea extends JPanel implements ActionListener, MouseListener, 
 					} else {getnew = true;}
 					if(getnew) {
 						for(int i = items.size()-1; i >= 0; i--) {
-							if(items.get(i).overlaps(me.getX(),me.getY())) { //Adjust coordinates to n-level-space
+							if(items.get(i).overlaps(me.getX(),me.getY())) {
 								last = items.get(i);
 								last.setHighlight(true);
 								mind.highlightItem(itemIndices[i]);

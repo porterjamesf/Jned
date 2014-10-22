@@ -903,6 +903,32 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		 mEdit.add(makeMenuItem("Delete","action#9"));
 		 mEdit.add(makeMenuItem("Select All","action#89"));
 		 mEdit.addSeparator();
+		  JMenu mNudge = new JMenu("Nudge");
+		  mNudge.add(makeMenuItem("Right","action#69"));
+		  mNudge.add(makeMenuItem("Down","action#70"));
+		  mNudge.add(makeMenuItem("Left","action#71"));
+		  mNudge.add(makeMenuItem("Up","action#72"));
+		 mEdit.add(mNudge);
+		  JMenu mDirection = new JMenu("Direction");
+		  mDirection.add(makeMenuItem("Right","action#45"));
+		  mDirection.add(makeMenuItem("Right/down","action#49"));
+		  mDirection.add(makeMenuItem("Down","action#46"));
+		  mDirection.add(makeMenuItem("Down/left","action#50"));
+		  mDirection.add(makeMenuItem("Left","action#47"));
+		  mDirection.add(makeMenuItem("Left/up","action#51"));
+		  mDirection.add(makeMenuItem("Up","action#48"));
+		  mDirection.add(makeMenuItem("Up/right","action#52"));
+		 mEdit.add(mDirection);
+		  JMenu mBehavior = new JMenu("Behavior");
+		  mBehavior.add(makeMenuItem("Surface-follow clockwise","action#53"));
+		  mBehavior.add(makeMenuItem("Surface-follow counter-clockwise","action#54"));
+		  mBehavior.add(makeMenuItem("Dumb clockwise","action#55"));
+		  mBehavior.add(makeMenuItem("Dumb counter-clockwise","action#56"));
+		  mBehavior.add(makeMenuItem("Alternating","action#57"));
+		  mBehavior.add(makeMenuItem("Quasi-random","action#58"));
+		  mBehavior.add(makeMenuItem("No behavior/still","action#59"));
+		 mEdit.add(mBehavior);
+		 mEdit.addSeparator();
 		 mEdit.add(makeMenuItem("Snapping","action#78"));
 		  mSnapSet = new JMenu("Snap setting");
 		  setSnapSettingMenu();
@@ -945,7 +971,8 @@ public class Jned extends JPanel implements ActionListener, MouseListener {
 		if(multicmd.length > 1) {					//Menu items that correspond to actions are automatically linked to that action #'s KeySetting object
 			if(multicmd[0].equals("action")) {
 				try {
-					keys.getKeySetting(Integer.parseInt(multicmd[1])).setSoulmate(mi);
+					KeySetting ks = keys.getKeySetting(Integer.parseInt(multicmd[1]));
+					if(ks != null) ks.setSoulmate(mi);
 				} catch (NumberFormatException e) {}
 			}
 		}

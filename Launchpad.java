@@ -69,6 +69,7 @@ public class Launchpad extends Item {
 			break;
 		}
 		calcRect();
+		setImage(ImageBank.LAUNCH);
 	}
 	
 	private void calcRect() {//Calculates the coordinates of the bounding box

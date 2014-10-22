@@ -228,7 +228,7 @@ public class SwitchDoor extends Door {
 		layer[2] = super.isSelected();
 		for(int i = 0; i < 3; i++) {
 			if(i==0) {
-				if(mind.drawImage(getImage()+4, getX(), getY(), g)) {
+				if(mind.drawImage(getImage()+4, getSuperX(), getSuperY(), g)) {
 					layer[0] = false;
 				} else {
 					g.setColor(Jned.ITEM);
