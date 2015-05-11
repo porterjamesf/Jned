@@ -1,11 +1,11 @@
-/*
-Pushable.java
-James Porter	01/05/2013
-
-Interface for buttons and multibuttons, which each have a push method. Useful for action commands that work the same on any of the buttons in a multibutton
-*/
-
+/**
+ * An object that can be pushed or unpushed, such as a Button or a MultiButton.
+ * @author James Porter
+ */
 public interface Pushable {
-	public void push();
-	public void unpush();
+  /**
+   * Pushes or unpushed the object.
+   * @param isPushed true to push, false to unpush
+   */
+  public void setPushed(boolean isPushed);
 }

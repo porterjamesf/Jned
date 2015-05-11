@@ -1,62 +1,114 @@
-/*
-Floorguard.java
+import java.awt.Graphics;
 
-James Porter
-*/
-
-import java.awt.*;
-
+/**
+ * A Floor guard item in Jned.
+ * @author James Porter
+ */
 public class Floorguard extends Item {
-	public final int	MENU_FLAGS = 0b000010;
-	private int deltx,
-				delty;
-	
-	public Floorguard (Jned mind, int xpos, int ypos) {
-		super(mind, 3, xpos, ypos);
-		deltx = delty = 0;
-		calcShape();
-		setImage(ImageBank.FLOOR);
-	}
-	
-	public int getFlags() {return MENU_FLAGS;}
-	
-	public Floorguard duplicate() {
-		return new Floorguard(mind, getX(), getY());
-	}
-	
-	public void calcShape() {
-		int[] xs = new int[6], ys = new int[6];
-		xs[0] = xs[5] = getX() + 6;
-		xs[1] = xs[2] = getX() - 6;
-		xs[3] = getX() - 2;
-		xs[4] = getX() + 2;
-		ys[0] = ys[1] = getY() + 6;
-		ys[2] = ys[5] = getY() - 2;
-		ys[3] = ys[4] = getY() - 6;
-		setShape(xs,ys);
-	}
-	
-	public String toString() {
-		return super.toString() + ",1";
-	}
-	
-	//Overrides Item - adjusts y position to be the center of cells + 6
-	public void moveTo(int xpos, int ypos) {
-		super.moveTo(xpos,24*(ypos/24)+18);
-	}
-	public void moveRelative(int xpos, int ypos) {		//Moves to a new position offset by the difference stored in deltax and deltay
-		super.moveTo(xpos-deltx, 24*((ypos-6-delty)/24)+18);
-	}
-	public void setDelta(int xpos, int ypos) {			//Sets the offset (deltax/deltay) to the difference between current position and given position
-		deltx = xpos-getX();
-		delty = ypos-getY();
-	}
-	
-	//Overrides Item
-	public static void paintGhost(int xpos, int ypos, Graphics g) {
-		g.setColor(Jned.ITEM_GHOST);
-		int[] xs = {xpos+6,xpos-6,xpos-6,xpos-2,xpos+2,xpos+6};
-		int[] ys = {ypos+6,ypos+6,ypos-2,ypos-6,ypos-6,ypos-2};
-		g.fillPolygon(xs,ys,6);
-	}	
+
+  /**
+   * The set of right-click menu flags appropriate for an Item with only horizontal nudging.
+   */
+  public final int  MENU_FLAGS = 0b000010;
+  
+  private int deltaX;
+  private int deltaY;
+  
+  /**
+   * Constructs a new Floorguard with the given position.
+   * @param jned a reference to the enclosing Jned instance
+   * @param x this Floorguard's x position
+   * @param y this Floorguard's y position
+   */
+  public Floorguard (Jned jned, int x, int y) {
+    super(jned, 3, x, y);
+    
+    deltaX = 0;
+    deltaY = 0;
+    
+    calculateShape();
+    setImage(ImageBank.FLOOR);
+  }
+  
+  public int getFlags() {
+    return MENU_FLAGS;
+  }
+  
+  /**
+   * Returns a copy of this Floorguard.
+   * @return a new Floorguard with the same properties as this Floorguard
+   */
+  public Floorguard duplicate() {
+    return new Floorguard(jned, getX(), getY());
+  }
+  
+  /**
+   * Calculates the polygon representing the shape and position of this Floorguard.
+   */
+  public void calculateShape() {
+    int[] xs = new int[6];
+    int[] ys = new int[6];
+    xs[0] = xs[5] = getX() + 6;
+    xs[1] = xs[2] = getX() - 6;
+    xs[3] = getX() - 2;
+    xs[4] = getX() + 2;
+    ys[0] = ys[1] = getY() + 6;
+    ys[2] = ys[5] = getY() - 2;
+    ys[3] = ys[4] = getY() - 6;
+    setShape(xs, ys);
+  }
+  
+  /**
+   * Returns a String representation of this Floorguard, in n level code format.
+   * @return n level code String for this Floorguard
+   */
+  public String toString() {
+    return super.toString() + ",1";
+  }
+  
+  /**
+   * Moves this Floorguard to a new position, adjusting y coordinate to snap to the nearest row.
+   * @param x the new x position
+   * @param y the new y position
+   */
+  public void moveTo(int x, int y) {
+    super.moveTo(x, 24 * (y / 24) + 18);
+  }
+  
+  /**
+   * Sets the reference point for relative movement, essentially the position of another Item to
+   * match movement with. Once set, calling moveRelative() with a new point will move this
+   * Floorguard by the same amount as the difference between the reference point and the supplied
+   * point.
+   * @param x the reference x position
+   * @param y the reference y position
+   */
+  public void setDelta(int x, int y) {
+    deltaX = x - getX();
+    deltaY = y - getY();
+  }
+  
+  /**
+   * Moves this Floorguard to a new position relative to its reference point. This Floorguard will
+   * move by the same amount as the difference between the supplied point and this Floorguard's
+   * reference point, with the y coordinate adjusted to snap to the nearest row.
+   * @param x the relative x position
+   * @param y the relative y position
+   */
+  public void moveRelative(int x, int y) {
+    super.moveTo(x - deltaX, 24 * ((y - 6 - deltaY) / 24) + 18);
+  }
+  
+  /**
+   * Paints a translucent silhouette of this Floorguard at the given position.
+   * @param x the x position to draw Floorguard ghost at
+   * @param y the y position to draw Floorguard ghost at
+   * @param g Graphics context to draw Floorguard ghost with
+   */
+  public static void paintGhost(int x, int y, Graphics g) {
+    g.setColor(Colors.ITEM_GHOST);
+    int[] xs = {x + 6, x - 6, x - 6, x - 2, x + 2, x + 6};
+    int[] ys = {y + 6, y + 6, y - 2, y -  6, y - 6, y - 2};
+    g.fillPolygon(xs, ys, 6);
+  }  
 }

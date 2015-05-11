@@ -1,16 +1,25 @@
-/*
-Gaussturret.java
-
-James Porter
-*/
-
+/**
+ * A Gauss turret item in Jned.
+ * @author James Porter
+ */
 public class Gaussturret extends Turret {
-	public Gaussturret (Jned mind, int xpos, int ypos) {
-		super(mind, 0,xpos,ypos);
-		setImage(ImageBank.GAUSS);
-	}
-	
-	public Gaussturret duplicate() {
-		return new Gaussturret(mind, getX(), getY());
-	}
+
+  /**
+   * Constructs a new Gaussturret with the given position.
+   * @param jned a reference to the enclosing Jned instance
+   * @param x this Gaussturret's x position
+   * @param y this Gaussturret's y position
+   */
+  public Gaussturret (Jned jned, int x, int y) {
+    super(jned, 0, x, y);
+    setImage(ImageBank.GAUSS);
+  }
+  
+  /**
+   * Returns a copy of this Gaussturret.
+   * @return a new Gaussturret with the same properties as this Gaussturret
+   */
+  public Gaussturret duplicate() {
+    return new Gaussturret(jned, getX(), getY());
+  }
 }

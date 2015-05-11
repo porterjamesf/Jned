@@ -1,1667 +1,1981 @@
-/*
-LevelArea.java
-James Porter
-
-The area representing the actual level in the Jned application. Contains the level data.
-*/
-
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.Graphics;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Collections;
 
-public class LevelArea extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
-	private int		cell,		//The size of one tile in pixels, n standard is 24
-					buttonDown,	//Set to a value when a mouse button is held down, to distinguish left and right button drag events. 0 = none, 1 = left, 2 = right
-					mode,		//Current editing mode (what will be placed with a click) Using in conjunction with isTiles
-								//For tile mode, this will use the same fields as the tiles 2d array
-								//For objects mode, this corresponds to fields outlined under FIELDS FOR ITEM MODES in Jned
-								//In both, the mode -1 represents selection mode
-								//Additionally, there are 3 modes for launchpad property editing: -2: power, -3: free direction, -4: power/direction
-					col,		//Tile column the mouse is over
-					row,		//Tile row the mouse is over
-					dcol,		//Tile mode: Width and height, measured in cells, of a dragged selected area. Item selection mode: the other corner of the selection box.
-					drow,		//	Item adding mode: the coordinates to add the object at (adjusted for snap position). Launchpad edit mode: reference point against mouse
-					orow,		//Original row and column clicked at the start of a drag operation
-					ocol,		//	Used during dragging to calculate drow and dcol in tile mode, or to start the selection box or store a right-click point in item mode
-					thePlayer,	//Index of the most recently added Player item, or -1 if none exists
-					itClX,		//Amalgamate X position of item clipboard contents
-					itClY;		//Amalgamate Y position of item clipboard contents
-	private boolean isTiles,	
-					mouseon,	//Whether the mouse is in the play area or not
-					dragged,	//Turns true if mouse is dragged between press and release, to distinguish clicks from drags
-					drawGrid,	//Whether or not to draw the gridlines
-					drawSnap,	//Whether or not to draw the snap points
-					snapTo,		//Whether or not to snap to the grid or ignore it
-					swtch,		//True whenever adding the switch part of a door/exit object
-					selectBox,	//True when dragging a selection box, false otherwise
-					grabPoint;	//Used to grab the mouse coordinates immediately after exiting a right-click menu (caught by the mouseon event).
-	private int[][] 		tiles,	//The tile data. Ints used correspond to indices in the charvals array below.
-							clip;	//Clipboard for sets of tiles. Used for copying/pasting tile blocks.
-	private ArrayList<Item>	items,	//Items and enemies of the level
-							selection,	//The list of currently selected items
-							itemClip;	//The clipboard for items, used for copying/pasting.
-	private ArrayList<Door>	doors;		//List of all doors on level: used for drone path calculations
-	private ArrayList<Drone> drones;	//List of all drones on level: used for drone path calculations
-	private ArrayList<Launchpad> pads;	//List of launchpads: variable; used for launchpad editing operations
-	private int[]			itemIndices;//Indices of the start of each item in the string representation, refreshed on each outputlevel call
-	private Item			last,	//The item currently under the mouse
-							rclick;	//The item that was just right-clicked on
-	public Jned mind;
-	private Overlay[] overlays;	//The grid line (0,1,2) and snapping (3) overlays
-	private ArrayList<Integer>	scratch1,	//Scratch variables used in drawing grid lines and snap points
-								scratch2;	//	Kept at global level to speed up drawing
-	private JPopupMenu	cpypst,		//The drop-down menu that allows the user to copy or paste tile blocks in tile selection mode
-						itemMenu;	//The drop_down menu that appears when you right-click on an item, or right-click with items selected
-	private JMenuItem[]	menuItems;	//An array of the different options that can appear on the itemMenu drop-down menu.
-	
-	//private TextBox tbox;		//Link to the text area of Jned
-	
-	/*		empty	filled	45		63thin	27thin	concave	half	63thick	27thick	convex
-		Q|	0		1		2		6		10		14		18		22		26		30
-		W|					3		7		11		15		19		23		27		31
-		S|					4		8		12		16		20		24		28		32
-		A|					5		9		13		17		21		25		29		33
-	*/
-	
-	private final char[] charvals = {'0','1',	'3','2','5','4',	//The characters used by n code
-												'G','F','I','H',	//for the various tiles. Indices
-												'?','>','A','@',	//in this array correspond to integer
-												'7','6','9','8',	//fields used in the tiles array
-												'Q','P','O','N',
-												'K','J','M','L',
-												'C','B','E','D',
-												';',':','=','<'};
+import javax.swing.JMenu;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 
-	//Constructor
-	public LevelArea (int xpos, int ypos, int wid, int hei, int square, Jned blown) {
-		setLayout(null);
-		setBounds(xpos,ypos,wid,hei);
-		setBackground(Jned.TILE_SPACE);
-		addMouseListener(this);
-		addMouseMotionListener(this);
-		cell = square;
-		mind = blown;
-		isTiles = true;
-		mouseon = dragged = grabPoint = false;
-		col = row = dcol = drow = itClX = itClY = buttonDown = 0;
-		mode = thePlayer = -1;
-		swtch = false;
-		
-		tiles = new int[31][23];
-		items = new ArrayList<Item>();
-		itemClip = new ArrayList<Item>();
-		selection = new ArrayList<Item>();
-		doors = new ArrayList<Door>();
-		drones = new ArrayList<Drone>();
-		pads = new ArrayList<Launchpad>();
-		last = rclick = null;
-		overlays = new Overlay[4];
-		scratch1 = scratch2 = null;
-		
-		//Tile copy/paste drop-down menu
-		cpypst = new JPopupMenu();
-		 JMenuItem miCut = new JMenuItem("Cut");
-		  miCut.addActionListener(this);
-		  miCut.setActionCommand("cut");
-		 JMenuItem miCopy = new JMenuItem("Copy");
-		  miCopy.addActionListener(this);
-		  miCopy.setActionCommand("copy");
-		 JMenuItem miPaste = new JMenuItem("Paste");
-		  miPaste.addActionListener(this);
-		  miPaste.setActionCommand("paste");
-		 JMenuItem miErase = new JMenuItem("Erase");
-		  miErase.addActionListener(this);
-		  miErase.setActionCommand("erase");
-		 JMenuItem miFill = new JMenuItem("Fill");
-		  miFill.addActionListener(this);
-		  miFill.setActionCommand("fill");
-		cpypst.add(miCut);
-		cpypst.add(miCopy);
-		cpypst.add(miPaste);
-		cpypst.add(miErase);
-		cpypst.add(miFill);
-		
-		//Item drop-down menu
-		menuItems = new JMenuItem[11];
-		itemMenu = new JPopupMenu();
-		menuItems[0] = new JMenuItem("Cut");
-		 menuItems[0].addActionListener(this);
-		 menuItems[0].setActionCommand("itemCut");
-		menuItems[1] = new JMenuItem("Copy");
-		 menuItems[1].addActionListener(this);
-		 menuItems[1].setActionCommand("itemCopy");
-		menuItems[2] = new JMenuItem("Paste");
-		 menuItems[2].addActionListener(this);
-		 menuItems[2].setActionCommand("itemPaste");
-		menuItems[3] = new JMenuItem("Delete");
-		 menuItems[3].addActionListener(this);
-		 menuItems[3].setActionCommand("itemDelete");		
-		JMenu nudgeMenu = new JMenu("Nudge");
-		 JMenuItem nuR = new JMenuItem("right");
-		  nuR.addActionListener(this);
-		  nuR.setActionCommand("nudgeRight");
-		 JMenuItem nuD = new JMenuItem("down");
-		  nuD.addActionListener(this);
-		  nuD.setActionCommand("nudgeDown");
-		 JMenuItem nuL = new JMenuItem("left");
-		  nuL.addActionListener(this);
-		  nuL.setActionCommand("nudgeLeft");
-		 JMenuItem nuU = new JMenuItem("up");
-		  nuU.addActionListener(this);
-		  nuU.setActionCommand("nudgeUp");
-		 nudgeMenu.add(nuR);
-		 nudgeMenu.add(nuD);
-		 nudgeMenu.add(nuL);
-		 nudgeMenu.add(nuU);
-		menuItems[4] = nudgeMenu;
-		JMenu hfnudgeMenu = new JMenu("Nudge");
-		 JMenuItem hfnuR = new JMenuItem("right");
-		  hfnuR.addActionListener(this);
-		  hfnuR.setActionCommand("nudgeRight");
-		 JMenuItem hfnuL = new JMenuItem("left");
-		  hfnuL.addActionListener(this);
-		  hfnuL.setActionCommand("nudgeLeft");
-		 hfnudgeMenu.add(hfnuR);
-		 hfnudgeMenu.add(hfnuL);
-		menuItems[5] = hfnudgeMenu;
-		JMenu direct = new JMenu("Direction");
-		 JMenuItem dirR = new JMenuItem("right");
-		  dirR.addActionListener(this);
-		  dirR.setActionCommand("dirRight");
-		 JMenuItem dirD = new JMenuItem("down");
-		  dirD.addActionListener(this);
-		  dirD.setActionCommand("dirDown");
-		 JMenuItem dirL = new JMenuItem("left");
-		  dirL.addActionListener(this);
-		  dirL.setActionCommand("dirLeft");
-		 JMenuItem dirU = new JMenuItem("up");
-		  dirU.addActionListener(this);
-		  dirU.setActionCommand("dirUp");
-		 direct.add(dirR);
-		 direct.add(dirD);
-		 direct.add(dirL);
-		 direct.add(dirU);
-		menuItems[6] = direct;
-		JMenu direct8 = new JMenu("Direction");
-		 JMenuItem dirR8 = new JMenuItem("right");
-		  dirR8.addActionListener(this);
-		  dirR8.setActionCommand("dirRight");
-		 JMenuItem dirRD8 = new JMenuItem("right/down");
-		  dirRD8.addActionListener(this);
-		  dirRD8.setActionCommand("dirRightDown");
-		 JMenuItem dirD8 = new JMenuItem("down");
-		  dirD8.addActionListener(this);
-		  dirD8.setActionCommand("dirDown");
-		 JMenuItem dirLD8 = new JMenuItem("down/left");
-		  dirLD8.addActionListener(this);
-		  dirLD8.setActionCommand("dirLeftDown");
-		 JMenuItem dirL8 = new JMenuItem("left");
-		  dirL8.addActionListener(this);
-		  dirL8.setActionCommand("dirLeft");
-		 JMenuItem dirLU8 = new JMenuItem("left/up");
-		  dirLU8.addActionListener(this);
-		  dirLU8.setActionCommand("dirLeftUp");
-		 JMenuItem dirU8 = new JMenuItem("up");
-		  dirU8.addActionListener(this);
-		  dirU8.setActionCommand("dirUp");
-		 JMenuItem dirRU8 = new JMenuItem("up/right");
-		  dirRU8.addActionListener(this);
-		  dirRU8.setActionCommand("dirRightUp");
-		 direct8.add(dirR8);
-		 direct8.add(dirRD8);
-		 direct8.add(dirD8);
-		 direct8.add(dirLD8);
-		 direct8.add(dirL8);
-		 direct8.add(dirLU8);
-		 direct8.add(dirU8);
-		 direct8.add(dirRU8);
-		menuItems[7] = direct8;
-		JMenu behav = new JMenu("Behavior");
-		 JMenuItem behSCW = new JMenuItem("Surface-follow Clockwise");
-		  behSCW.addActionListener(this);
-		  behSCW.setActionCommand("surfCW");
-		 JMenuItem behSCCW = new JMenuItem("Surface-follow Counter-clockwise");
-		  behSCCW.addActionListener(this);
-		  behSCCW.setActionCommand("surfCCW");
-		 JMenuItem behDCW = new JMenuItem("Dumb Clockwise");
-		  behDCW.addActionListener(this);
-		  behDCW.setActionCommand("dumbCW");
-		 JMenuItem behDCCW = new JMenuItem("Dumb Counter-clockwise");
-		  behDCCW.addActionListener(this);
-		  behDCCW.setActionCommand("dumbCCW");
-		 JMenuItem behALT = new JMenuItem("Alternating");
-		  behALT.addActionListener(this);
-		  behALT.setActionCommand("alt");
-		 JMenuItem behRAND = new JMenuItem("Quasi-random");
-		  behRAND.addActionListener(this);
-		  behRAND.setActionCommand("rand");
-		 JMenuItem behNONE = new JMenuItem("None (still)");
-		  behNONE.addActionListener(this);
-		  behNONE.setActionCommand("none");
-		 behav.add(behSCW);
-		 behav.add(behSCCW);
-		 behav.add(behDCW);
-		 behav.add(behDCCW);
-		 behav.add(behALT);
-		 behav.add(behRAND);
-		 behav.add(behNONE);
-		menuItems[8] = behav;
-		menuItems[9] = new JMenuItem("Set to Active Player");
-		 menuItems[9].addActionListener(this);
-		 menuItems[9].setActionCommand("activePlayer");
-		JMenu launch = new JMenu("Launchpad options");
-		 JMenuItem lauPow = new JMenuItem("Power");
-		  lauPow.addActionListener(this);
-		  lauPow.setActionCommand("launchPower");
-		 JMenuItem lauDir = new JMenuItem("Free direction");
-		  lauDir.addActionListener(this);
-		  lauDir.setActionCommand("launchDir");
-		 JMenuItem lauPD = new JMenuItem("Power/direction");
-		  lauPD.addActionListener(this);
-		  lauPD.setActionCommand("launchPowDir");
-		 launch.add(lauPow);
-		 launch.add(lauDir);
-		 launch.add(lauPD);
-		menuItems[10] = launch;
-	}
-	
-	//Accessor/mutator methods
-	public boolean getBoolMode() {
-		return isTiles;
-	}
-	public int getIntMode() {
-		return mode;
-	}
-	public void setMode(int m, boolean isT) {
-		setMode(m);
-		setMode(isT);
-	}
-	public void setMode(int m) {
-		mode = m;
-		swtch = false;
-	}
-	public void setMode(boolean isT) {
-		isTiles = isT;
-		if(isTiles) clearSelection();
-		drow = dcol = orow = ocol = 0; 	//Cancel a dragged selection
-		setMode(-1);					//Put into selection mode
-	}
-	//Edits tile data according to already-stored mouse position and mode information
-	private void edit() {
-		for (int i = Math.min(col, col+dcol) - 1; i < Math.max(col, col+dcol); i++) {
-			for (int j = Math.min(row, row+drow) - 1; j < Math.max(row, row+drow); j++) {
-				if(mind.shift) {
-					if(mode > 1) {
-						tiles[i][j] = (mode > 17?mode-16:mode+16);
-					} else {
-						tiles[i][j] = 1 - mode;
-					}
-				} else {
-					tiles[i][j] = mode;
-				}
-				chDronePaths();
-			}
-		}
-	}
-	//Puts together all the options that should appear on the drop-down menu, based on flag parameters passed in
-	private void compileMenu(int flags) {
-		for(JMenuItem  mi : menuItems) { //Clears all optional menu items from the list
-			itemMenu.remove(mi);
-		}
-		if(selection.size() > 0 || rclick != null) { //Copy, cut
-			itemMenu.add(menuItems[0]);
-			itemMenu.add(menuItems[1]);
-		}
-		if(itemClip.size() > 0) { //Paste
-			itemMenu.add(menuItems[2]);
-		}
-		if(selection.size() > 0 || rclick != null) { //Delete
-			itemMenu.add(menuItems[3]);
-		}
-		if((flags & 0b000001) > 0) { //Nudge, all 4 directions
-			itemMenu.add(menuItems[4]);
-		}
-		if((flags & 0b000010) > 0 && (flags & 0b000001) == 0) { //Nudge, left & right only (floorguard)
-			itemMenu.add(menuItems[5]);
-		}
-		if((flags & 0b000100) > 0) { //Direction
-			itemMenu.add(menuItems[6]);
-		}
-		if((flags & 0b100000) > 0) {
-			itemMenu.remove(menuItems[6]);
-			itemMenu.add(menuItems[7]);
-		}
-		if((flags & 0b001000) > 0) { //Behavior (drones)
-			itemMenu.add(menuItems[8]);
-		}
-		if((flags & 0b010000) > 0) { //Active player (only if 1 player is selected and more than 1 exist)
-			int pcount = 0, plind = -1;
-			for (Item it : selection) {
-				if(it.getType()==9) {
-					pcount++; 								//Counts number of selected players
-					plind = items.indexOf(it); 				//Stores index of most recently added one
-				}
-			}
-			if(pcount<=1) { 								//If there's only one selected, then plind stores its index
-				if(pcount==0) plind = items.indexOf(rclick); 	//If none are selected, plind should just be set to the one under the mouse
-				if(thePlayer != plind) { 					//If the sole selected player (or player under mouse) is not the active player,
-					itemMenu.add(menuItems[9]);				//then the menu shows the option to make it the active player
-				}
-			}
-		}
-		if((flags & 0b100000) > 0) { //Launchpad options (incomplete)
-			itemMenu.add(menuItems[10]);
-		}
-	}
-	
-	//In selection mode, selects every item or expands tile selection box to whole level
-	public void selectAll() {
-		if(mode==-1) {
-			if(isTiles) {
-				dcol = 30;
-				drow = 22;
-				borderCheck();
-			} else {
-				clearSelection();
-				for(Item it : items) {
-					selection.add(it);
-					it.setSelect(true);
-				}
-			}
-		}
-	}
-	
-	//Copies the currently selected item or items to the item clipboard
-	private void copyItems(boolean cut) {
-		if(selection.size()==0) {
-			if(rclick != null) {
-				itemClip.clear();
-				itemClip.add(rclick.duplicate());
-				if(rclick.getType() == 12) { //Exit - need to also add the switch position
-					Exit itex =(Exit)rclick;
-					itClX = (itex.getSuperX() + itex.getSwitchX())/2;
-					itClY = (itex.getSuperY() + itex.getSwitchY())/2;
-				} else {
-					if(rclick.getType() == 15 || rclick.getType() == 16) { //Switchdoor - need to also add the door position
-						SwitchDoor itsw = (SwitchDoor)rclick;
-						int dir = itsw.getDirection();
-						itClX = (itsw.getSuperX() + 24*itsw.getRow() + (dir==0?24:(dir==2?0:12)))/2;
-						itClY = (itsw.getSuperY() + 24*itsw.getColumn() + (dir==1?24:(dir==3?0:12)))/2;
-					} else {
-						itClX = rclick.getX();
-						itClY = rclick.getY();
-					}
-				}
-				if(cut) {
-					selection.add(rclick);
-					pushDelete();
-				}
-			}
-		} else {
-			itemClip.clear();
-			int tot = itClX = itClY = 0;
-			for(Item it : selection) { //Gets the X and Y positions of each selected item and totals them,
-				itemClip.add(it.duplicate()); // while also adding duplicates to the clipboard
-				tot++;
-				if(it.getType() == 12) { //Exit - need to also add the switch position
-					Exit itex =(Exit)it;
-					itClX += itex.getSuperX() + itex.getSwitchX();
-					itClY += itex.getSuperY() + itex.getSwitchY();
-					tot++;
-				} else {
-					if(it.getType() == 15 || it.getType() == 16) { //Switchdoor - need to also add the door position
-						SwitchDoor itsw = (SwitchDoor)it;
-						int dir = itsw.getDirection();
-						itClX += itsw.getSuperX() + 24*itsw.getRow() + (dir==0?24:(dir==2?0:12));
-						itClY += itsw.getSuperY() + 24*itsw.getColumn() + (dir==1?24:(dir==3?0:12));
-						tot++;
-					} else {
-						itClX += it.getX();
-						itClY += it.getY();
-					}
-				}
-			}
-			itClX /= tot; //Sets values to the average of all the objects' positions
-			itClY /= tot;
-						
-			if(cut) pushDelete();
-		}
-	}
-	//Pastes the contents of the item clipboard, centered around the mouse location
-	private void pasteItems() {
-		clearSelection();
-		Item nitem;
-		for(Item it : itemClip) {						//All the copied items
-			nitem = it.duplicate();						// are duplicated, and the duplicates
-			items.add(nitem);							// are placed in the level
-			selection.add(nitem);						// and selected,
-			if(nitem.getType()==12) {						// including the dual components of
-				((Exit)nitem).setSelect(true, true);		// exits and switch doors,
-			} else {									// ensuring that both parts will be moved appropriately
-				if(nitem.getType()==15 || nitem.getType()==16) {
-					((SwitchDoor)nitem).setSelect(true, true);
-				} else {
-					nitem.setSelect(true);
-				}
-			}
-			if(nitem.getType()==9) {thePlayer = items.size() - 1;} //If a player is added, it is set to the active player
-			nitem.setDelta(itClX, itClY);					//The delta value is set to the average position of all copied items
-			nitem.moveRelative(orow, ocol);				// and then it is moved relative to this, so pasted items are centered around the mouse
-			
-			if(nitem.getType()==14 || nitem.getType()==15 || nitem.getType()==16) doors.add((Door)nitem);					//Finally, doors and drones are added
-			if(nitem.getType()==5 || nitem.getType()==6 || nitem.getType()==7 || nitem.getType()==8) drones.add((Drone)nitem);	// to their respective lists
-		}
-		
-		mind.updateText(outputLevel());
-		chDronePaths();
-		calcDronePaths();
-	}
-	//Copies the currently selected tile or tile block to the tile clipboard
-	private void copyTiles(boolean cut) {
-		clip = new int[Math.abs(dcol)+1][Math.abs(drow)+1];
-		ocol = Math.min(col, col+dcol)-1;
-		orow = Math.min(row, row+drow)-1;
-		for(int i = 0; i < clip.length; i++) {
-			for(int j = 0; j < clip[0].length; j++) {
-				clip[i][j] = tiles[ocol+i][orow+j];
-				if(cut) tiles[ocol+i][orow+j] = 0;
-			}
-		}
-		if(cut) mind.updateText(outputLevel());
-	}
-	//Pastes the tile clipboard contents to the level. If the selected tile block is smaller than the tile clipboard block, it will
-	// paste as much as possible, matching the upper left corner. If it is larger, it will loop and paste multiple copies of the tile
-	// clipboard block.
-	private void pasteTiles() {
-		if(clip != null) {
-			ocol = Math.min(col, col+dcol)-1;
-			orow = Math.min(row, row+drow)-1;
-			for(int i = 0; i <= Math.abs(dcol); i++) {
-				for(int j = 0; j <= Math.abs(drow); j++) {
-					tiles[ocol+i][orow+j] = clip[i%clip.length][j%clip[0].length];
-				}
-			}
-			chDronePaths();
-			calcDronePaths();
-			mind.updateText(outputLevel());
-		}
-	}
-	//Sets all the selected tiles to either filled (true) or empty (false)
-	private void setTiles(boolean fill) {
-		ocol = Math.min(col, col+dcol)-1;
-		orow = Math.min(row, row+drow)-1;
-		for(int i = 0; i <= Math.abs(dcol); i++) {
-			for(int j = 0; j <= Math.abs(drow); j++) {
-				tiles[ocol+i][orow+j] = (fill?1:0);
-			}
-		}
-		chDronePaths();
-		calcDronePaths();
-		mind.updateText(outputLevel());
-	}
-	public void chDronePaths() {
-		for(Drone dr : drones) {
-			dr.chPath();
-		}
-	}
-	private void calcDronePaths() {
-		for(Drone dr : drones) {
-			dr.calcPath(tiles, doors);
-		}
-	}
-	public void setOverlay(int index, Overlay over) {
-		overlays[index] = over;
-	}
-	public void drawGrid(boolean dgr) { //Sets whether or not to draw the grid lines
-		drawGrid = dgr;
-	}
-	public void drawSnap(boolean dsn) { //Sets whether or not to draw the snap points
-		drawSnap = dsn;
-	}
-	public void snapTo(boolean snt) { //Sets whether or not to snap objects to the snap points
-		snapTo = snt;
-	}
-	public boolean drawGrid() {return drawGrid;}
-	public boolean drawSnap() {return drawSnap;}
-	public boolean snapTo() {return snapTo;}
-	public String outputLevel() { //Outputs level data as a string in n editor format
-		//Tiles
-		char[] tls = new char[713];
-		for(int c = 0; c < 31; c++) {
-			for(int r = 0; r < 23; r++) {
-				tls[r+23*c] = charvals[tiles[c][r]];
-			}
-		}
-		String result = new String(tls) + "|";
-		
-		//Items
-		String things = "";
-		itemIndices = new int[items.size()];
-		int pos = 0;
-		if(thePlayer >= 0) {
-			things += items.get(thePlayer).toString() + (items.size()>1?"!":"");
-			itemIndices[thePlayer] = pos;
-			pos = things.length();
-		}
-		for(int i = 0; i < items.size(); i++) {
-			if(i!=thePlayer) {
-				things += items.get(i).toString() + (i==items.size()-1?"":"!");
-				itemIndices[i] = pos;
-				pos = things.length();
-			}
-		}
-		return result + things;
-	}
-	/*public void inputLevel(String name, String author, String genre, String data) {
-		setAttributes(name,author,genre);
-		inputLevel(data);
-	}*/
-	public void inputLevel(String data) { //Edits level data to match a string in n editor format
-		String valchars = new String(charvals);
-		//Tiles
-		for(int c = 0; c < 31; c++) {
-			for(int r = 0; r < 23; r++) {
-				tiles[c][r] = valchars.indexOf(data.charAt(r+23*c));
-			}
-		}
-		
-		//Items
-		thePlayer = -1;
-		items.clear();
-		selection.clear();
-		drones.clear();
-		doors.clear();
-		if(data.length() > 714) {	//Index 713 (the 714th character) is the "|" between tile data and item data
-			String[] itemCodes = data.substring(714).split("!");
-			String[] typedat, sparams;
-			double[] params;
-			for(String it : itemCodes) {			//For each item,
-				typedat = it.split("\\^");			//typedat will contain the type number in [0] and the rest of the info in [1], 
-				sparams = typedat[1].split(",");	//and params will contain that info split up into each comma-separated parameter
-				params = new double[sparams.length];
-				for(int i = 0; i < sparams.length; i++) params[i] = Double.parseDouble(sparams[i]);
-				Item nitem = null;
-				switch (typedat[0]) {
-					case "0": //Gold
-						nitem = new Gold(mind,(int)params[0],(int)params[1]);
-					break;
-					case "1": //Bounce block
-						nitem = new Bounceblock(mind,(int)params[0],(int)params[1]);
-					break;
-					case "2": //Launch pad
-						nitem = new Launchpad(mind,(int)params[0],(int)params[1],params[2],params[3]);
-					break;
-					case "3": //Gauss turret
-						nitem = new Gaussturret(mind,(int)params[0],(int)params[1]);
-					break;
-					case "4": //Floor guard
-						nitem = new Floorguard(mind,(int)params[0],(int)params[1]);
-					break;
-					case "5": //Player
-						nitem = new Player(mind,(int)params[0],(int)params[1]);
-						thePlayer = 0;
-					break;
-					case "6": //Drone
-						if(params[3]==1) { //Seeker
-							nitem = new Seekerdrone(mind,(int)params[0],(int)params[1],(int)params[5],(int)params[2]);
-						} else {
-							switch((int)params[4]) {
-								default:
-								case 0: //Zap
-									nitem = new Zapdrone(mind,(int)params[0],(int)params[1],(int)params[5],(int)params[2]);
-								break;
-								case 1: //Laser
-									nitem = new Laserdrone(mind,(int)params[0],(int)params[1],(int)params[5],(int)params[2]);
-								break;
-								case 2: //Chaingun
-									nitem = new Chaingundrone(mind,(int)params[0],(int)params[1],(int)params[5],(int)params[2]);
-								break;
-							}
-						}
-						drones.add((Drone)nitem);
-					break;
-					case "7": //Oneway platform
-						nitem = new Oneway(mind,(int)params[0],(int)params[1],(int)params[2]);
-					break;
-					case "8": //Thwump
-						nitem = new Thwump(mind,(int)params[0],(int)params[1],(int)params[2]);
-					break;
-					case "9": //Door
-						int dir = (int)params[2];
-						if(params[7]==-1) dir = 2;
-						if(params[8]==-1) dir = 3;
-						
-						if(params[3]==1) { //Trap
-							nitem = new Trapdoor(mind,(int)params[0],(int)params[1],dir,(int)params[4],(int)params[5]);
-						} else {
-							if(params[6]==1) { //Locked
-								nitem = new Lockeddoor(mind,(int)params[0],(int)params[1],dir,(int)params[4],(int)params[5]);
-							} else { //Normal
-								nitem = new Normaldoor(mind,dir,(int)params[4],(int)params[5]);
-							}
-						}
-						doors.add((Door)nitem);
-					break;
-					case "10": //Homing launcher
-						nitem = new Hominglauncher(mind,(int)params[0],(int)params[1]);
-					break;
-					case "11": //Exit
-						nitem = new Exit(mind,(int)params[0],(int)params[1],(int)params[2],(int)params[3]);
-					break;
-					case "12": //Mine
-						nitem = new Mine(mind,(int)params[0],(int)params[1]);
-					default:
-					break;
-				}
-				if(nitem != null) {
-					items.add(nitem);
-				}
-			}
-		}
-		mind.updateText(outputLevel()); //Called simply to update the item indices array
-		chDronePaths();
-		calcDronePaths();
-	}
-	
-	//Interface methods
-	public void mouseClicked(MouseEvent me) {}
-	public void mouseMoved(MouseEvent me) {
-		if(isTiles) {//Tile mode
-			orow = row;
-			ocol = col;
-			mouseMoveTile(me);
-			if(orow != row || ocol != col) cpypst.setVisible(false);
-			mind.highlightTile(row-1+23*(col-1));
-		} else {	//Item mode
-			if(mode < 0) {
-				if(mode ==-1) { //Selection mode: check under the mouse and do highlighting
-					boolean getnew = false;
-					orow = me.getX();
-					ocol = me.getY();
-					if(last != null) {
-						if(!last.overlaps(me.getX(),me.getY())) {
-							last.setHighlight(false);
-							last = null;
-							getnew = true;
-							mind.unHighlight();
-						}
-					} else {getnew = true;}
-					if(getnew) {
-						for(int i = items.size()-1; i >= 0; i--) {
-							if(items.get(i).overlaps(me.getX(),me.getY())) {
-								last = items.get(i);
-								last.setHighlight(true);
-								mind.highlightItem(itemIndices[i]);
-								i = -1;
-							}
-						}
-					}
-				} else { //Launchpad editing mode
-					double val;
-					switch(mode) {
-						case -2: //Power
-							double theta = -pads.get(0).getDirection();
-							val = ((me.getX()-drow)*Math.cos(theta) - (me.getY()-dcol)*Math.sin(theta))/24.0;
-							if(val > 0.000000000000001 || val < -0.000000000000001) {
-								pads.get(0).setPower(val);
-								for(int i = 1; i < pads.size(); i++) {
-									pads.get(i).setPower(val);
-								}
-							}
-						break;
-						case -3: //Direction
-							val = Math.atan2(me.getY()-dcol,me.getX()-drow);
-							pads.get(0).setDirection(val);
-							for(int i = 1; i < pads.size(); i++) {
-								pads.get(i).setDirection(val);
-							}
-						break;
-						case -4: //Both
-							val = (me.getX()-drow)/24.0;
-							double val2 = (me.getY()-dcol)/24.0;
-							pads.get(0).setPowerX(val);
-							pads.get(0).setPowerY(val2);
-							for(int i = 1; i < pads.size(); i++) {
-								pads.get(i).setPowerX(val);
-								pads.get(i).setPowerY(val2);
-							}
-						break;
-					}
-				}
-			} else {		//Item adding mode
-				drow = me.getX();
-				dcol = me.getY();
-				if(mode >= Jned.NDOOR && mode <= Jned.TDOOR+3 && !swtch) {//Door adding mode: set drow & dcol to the cell containing the mouse
-					drow /= cell;
-					dcol /= cell;
-				} else {
-					if(mode >= Jned.ZAP && mode <= Jned.CHAINGUN+27) {//Drone adding mode: snap to centers of cells
-						drow = (drow/cell)*cell+cell/2;
-						dcol = (dcol/cell)*cell+cell/2;
-					} else {
-						if(snapTo) { //Snap the x coordinate to nearest snap point
-							drow = snapCoord(drow, true);
-						}
-						if(mode == Jned.FLOOR) {//Floorguard adding mode: snap the y coordinate to cell edges + 18
-							dcol = (dcol/cell)*cell+3*cell/4;
-						} else {
-							if(snapTo) {//Snap the y coordinate to nearest snap point
-								dcol = snapCoord(dcol, false);
-							}
-						}
-					}
-				}
-			}
-		}
-		repaint();
-	}
-	public void mouseDragged(MouseEvent me) {
-		if(buttonDown==1) { //Left
-			if(isTiles) {
-				mouseMoveTile(me);
-				if(mode == -1) { //Selection mode: drag selection box
-					if(ocol != col || orow != row) {
-						dcol = ocol-col;
-						drow = orow-row;
-						dragged = true;
-					}
-				} else {	//Not selection mode: edit all selected tiles
-					edit();
-				}
-			} else { //Items mode
-				if(mode == -1) { //Selection mode
-					drow = me.getX();		//In selection box mode, the paint method will just draw a box from (orow,ocol) to (drow,dcol)
-					dcol = me.getY();		// Otherwise, these values are used to move the selected items
-					if(!selectBox) {
-						if(snapTo) {
-							last.moveTo(snapCoord(drow,true),snapCoord(dcol,false));
-							for(Item it : selection) {
-								it.moveRelative(last.getX(), last.getY());
-							}
-						} else {
-							for(Item it : selection) {
-								it.moveRelative(drow, dcol);
-							}
-						}
-					}
-				} else { //Item adding mode, launchpad editing mode
-					//No action
-				}
-			}
-		}
-		repaint();
-	}
-	//Returns the nearest snap point to a given coordinate
-	protected int snapCoord(int coord, boolean isX) {
-		scratch1 = overlays[3].getPoints(isX);
-		int ind = Collections.binarySearch(scratch1,coord); 		//Finds nearest snap point
-		if(ind < 0) ind = -ind - 1;									//Corrects for the binarySearch method's output format when an exact value is not found
-		try {
-			if(coord-scratch1.get(ind-1)<scratch1.get(ind)-coord) {	//Figures out which neighboring snap point is closer
-				return scratch1.get(ind-1);							//  and returns that value
-			} else {
-				return scratch1.get(ind);
-			}
-		} catch (IndexOutOfBoundsException ioobe) {return coord;}	//If the mouse goes outside the level area, the given coordinate is returned
-	}
-	private void mouseMoveTile (MouseEvent me) {
-		col = (me.getX())/cell;
-		row = (me.getY())/cell;
-		borderCheck();
-	}
-	private void borderCheck() { //works using magic
-		col -= Math.min(Math.min(0,dcol)+col-1,0) + Math.max(Math.max(0,dcol)+col-31,0);
-		row -= Math.min(Math.min(0,drow)+row-1,0) + Math.max(Math.max(0,drow)+row-23,0);
-	}
-	public void mousePressed(MouseEvent me) {
-		if(me.getButton()==MouseEvent.BUTTON1) {//Left
-			buttonDown = 1;
-			if(isTiles) {
-				orow = row;
-				ocol = col;
-				dragged = false;
-			} else { //Items mode
-				if(mode < 0) {
-					if(mode == -1) { //Selection mode
-						orow = me.getX();						//Coordinates of the click are stored, to be used for dragging reference points	
-						ocol = me.getY();						//  when dragging items, or box drawing when dragging a selection box
-						if(last == null || mind.shift) {		//Selection box dragging begins when clicking on nothing or shift-clicking
-							if(!mind.ctrl) clearSelection();	//Ctrl-shift clicking or ctrl-clicking nothing keeps previous selection, otherwise it is cleared
-							drow = me.getX();					//These are set to the same points as orow & ocol immediately, to prevent drawing a selection
-							dcol = me.getY();					//  box from orow,ocol to their previous position for one frame
-							selectBox = true;					
-						} else {								//Clicking on an item (not shift-click)
-							if(last.isSelected() && mind.ctrl) {	//Ctrl clicking on a selected item
-								selection.remove(last);				//  results in removing it from the selection
-								last.setSelect(false);				//  and beginning a box-drag operation, just as if
-								drow = me.getX();					//  you had ctrl-clicked on nothing	
-								dcol = me.getY();
-								selectBox = true;
-							} else {
-								if(!last.isSelected() && !mind.ctrl) clearSelection(); //If the item is outside the selection and this isn't a ctrl-click, the selection is cleared
-								selection.add(last);				//Adds item to selection
-								last.setSelect(true);
-								if(snapTo) {
-									for(Item it : selection) {
-											it.setDelta(last.getX(), last.getY());
-									}
-								} else {
-									for(Item it : selection) {			//This sets the internal reference values for each selected item, so it knows where it is relative to the click
-										it.setDelta(orow, ocol);
-									}
-								}
-							}
-						}
-					} else { //Launchpad editing mode
-						//No action
-					}
-				} else { //Item adding mode
-					//No action
-				}
-			}
-		}
-		if(me.getButton()==MouseEvent.BUTTON3) {//Right
-			buttonDown = 2;
-		}
-		repaint();
-	}
-	public void mouseReleased(MouseEvent me) {
-		buttonDown = 0;
-		if(me.getButton()==MouseEvent.BUTTON1) {//Left
-			if(isTiles) {//Tile mode
-				if(mode == -1) { //Selection mode
-					if(!dragged) {
-						drow = dcol = 0; //Cancel a dragged selection
-					}
-				} else {	//Editing mode
-					edit();
-				}
-			} else {//Item mode
-				if(mode < 0) {
-					if(mode == -1) { //Selection mode
-						if(selectBox) {
-							Rectangle serect = new Rectangle(Math.min(orow,drow),Math.min(ocol,dcol),Math.abs(drow-orow),Math.abs(dcol-ocol));
-							for (Item it : items) {
-								if(it.overlaps(serect)) {
-									selection.add(it);
-									it.setSelect(true);
-								}
-							}
-							selectBox = false;
-						}
-					} else { //Launchpad editing mode
-						mode = -1;
-					}
-				} else { //Item adding mode
-					int type = getType(mode);
-					Item nitem = null;
-					switch(type) {
-						case 0: //Gauss turrent
-							nitem = new Gaussturret(mind, drow, dcol);
-						break;
-						case 1: //Homing launcher
-							nitem = new Hominglauncher(mind, drow, dcol);
-						break;
-						case 2: //Mine
-							nitem = new Mine(mind, drow, dcol);
-						break;
-						case 3: //Floorguard
-							nitem = new Floorguard(mind, drow, dcol);
-						break;
-						case 4: //Thwump
-							nitem = new Thwump(mind, drow, dcol, mode - Jned.THWUMP);
-						break;
-						case 5: //Zap drone
-							nitem = new Zapdrone(mind, drow,dcol,(mode - Jned.ZAP)/7,(mode - Jned.ZAP)%7);
-							drones.add((Drone)nitem);
-						break;
-						case 6: //Seeker drone
-							nitem = new Seekerdrone(mind, drow,dcol,(mode - Jned.SEEKER)/7,(mode - Jned.SEEKER)%7);
-							drones.add((Drone)nitem);
-						break;
-						case 7: //Laser drone
-							nitem = new Laserdrone(mind, drow,dcol,(mode - Jned.LASER)/7,(mode - Jned.LASER)%7);
-							drones.add((Drone)nitem);
-						break;
-						case 8: //Chaingun drone
-							nitem = new Chaingundrone(mind, drow,dcol,(mode - Jned.CHAINGUN)/7,(mode - Jned.CHAINGUN)%7);
-							drones.add((Drone)nitem);
-						break;
-						case 9: //Player
-							nitem = new Player(mind, drow, dcol);
-							thePlayer = items.size();
-						break;
-						case 10: //Gold
-							nitem = new Gold(mind, drow, dcol);
-						break;
-						case 11: //Bounce block
-							nitem = new Bounceblock(mind, drow, dcol);
-						break;
-						case 12: //Exit door
-							if(swtch) {
-								nitem = new Exit(mind, orow,ocol,drow,dcol);
-								swtch = false;
-							} else {
-								orow = drow;
-								ocol = dcol;
-								drow = me.getX();
-								dcol = me.getY();
-								swtch = true;
-							}
-						break;
-						case 13: //Oneway platform
-							nitem = new Oneway(mind, drow,dcol,mode - Jned.ONEWAY);
-						break;
-						case 14: //Normal door
-							nitem = new Normaldoor(mind, mode-Jned.NDOOR,drow,dcol);
-							doors.add((Door)nitem);
-						break;
-						case 15:
-						case 16:
-							if(swtch) {
-								if(type==15) {//Locked door
-									nitem = new Lockeddoor(mind, drow,dcol,mode-Jned.LDOOR,orow,ocol);
-								} else {//Trap door
-									nitem = new Trapdoor(mind, drow,dcol,(mode - Jned.NDOOR)%4,orow,ocol);
-								}
-								swtch = false;
-								doors.add((Door)nitem);
-							} else { //Either
-								orow = drow;
-								ocol = dcol;
-								drow = me.getX();
-								dcol = me.getY();
-								swtch = true;
-							}
-						break;
-						case 17: //Launch pad
-							nitem = new Launchpad(mind, drow,dcol,mode-Jned.LAUNCH);
-						break;
-						default: case -1: break;
-					}
-					if(nitem != null) {
-						items.add(nitem);
-					}
-				}
-			}
-			mind.updateText(outputLevel());
-			calcDronePaths();
-		}
-		if(me.getButton()==MouseEvent.BUTTON3) {//Right
-			if(isTiles) {
-				if(mode == -1) { //Tile selection mode
-					cpypst.show(this, me.getX(), me.getY());
-				}
-			} else {
-				if(mode == -1) { //Item Selection mode
-					orow = me.getX();
-					ocol = me.getY();
-					if(selectBox) { //Selection box being dragged
-						selectBox = false; //Cancel a dragged selection box
-					} else {
-						if(selection.size() > 0) { //One or more items are selected
-							int flags = 0;
-							for(Item it : selection) {
-								flags = flags | it.getFlags();
-							}
-							compileMenu(flags);
-							itemMenu.show(this, me.getX(), me.getY());
-						} else { //Nothing selected
-							if(last != null) { //Right-click on an item
-								rclick = last;
-								compileMenu(rclick.getFlags());
-								itemMenu.show(this, me.getX(), me.getY());
-							} else { //Right-click on nothing
-								rclick = null;
-								compileMenu(0);
-								itemMenu.show(this, me.getX(), me.getY());
-							}
-						}
-					}
-				} else {
-					if(mode < -1) { //Launchpad editing mode
-						mode = -1;
-						mind.updateText(outputLevel());
-					}
-				}
-			}
-		}
-		repaint();
-	}
-	
-	//Returns the type number for an item, given the mode. Type numbers correspond to Jned indices for button menus
-	public int getType(int code) {
-		if(code == Jned.GAUSS) return 0;
-		if(code == Jned.HOMING) return 1;
-		if(code == Jned.MINE) return 2;
-		if(code == Jned.FLOOR) return 3;
-		if(code >= Jned.THWUMP && code <= Jned.THWUMP + 3) return 4;
-		if(code >= Jned.ZAP && code <= Jned.ZAP + 27) return 5;
-		if(code >= Jned.SEEKER && code <= Jned.SEEKER + 27) return 6;
-		if(code >= Jned.LASER && code <= Jned.LASER + 27) return 7;
-		if(code >= Jned.CHAINGUN && code <= Jned.CHAINGUN + 27) return 8;
-		if(code == Jned.PLAYER) return 9;
-		if(code == Jned.GOLD) return 10;
-		if(code == Jned.BOUNCE) return 11;
-		if(code == Jned.EXIT) return 12;
-		if(code >= Jned.ONEWAY && code <= Jned.ONEWAY + 3) return 13;
-		if(code >= Jned.NDOOR && code <= Jned.NDOOR + 3) return 14;
-		if(code >= Jned.LDOOR && code <= Jned.LDOOR + 3) return 15;
-		if(code >= Jned.TDOOR && code <= Jned.TDOOR + 3) return 16;
-		if(code >= Jned.LAUNCH && code <= Jned.LAUNCH + 7) return 17;
-		return -1;
-	}
-	//Clears the list of selected items and tells each one it isn't selected anymore
-	private void clearSelection() {
-		for(Item it: selection) {
-			it.setSelect(false);
-		}
-		selection.clear();
-	}
-	//Happens when the backspace key is pushed in the main window, or the delete command is selected from a drop-down menu or the edit menu
-	public void pushDelete() {
-		if(selection.size() > 0 ) {
-			for(Item it: selection) {
-				removeItem(it);
-			}
-			selection.clear();
-		} else {
-			if(rclick != null) {
-				removeItem(rclick);
-			}
-		}
-		mind.updateText(outputLevel());
-	}
-	private void removeItem(Item it) {
-		int ind = items.indexOf(it);
-		if(ind==thePlayer) { //If deleted item is the active Player, a new one must be found
-			boolean notfound = true;
-			for(int i = items.size() - 1; i >= 0; i--) {
-				if(items.get(i).getType()==9 && thePlayer != i) {
-					thePlayer = i;
-					i = -2;
-					notfound = false;
-				}
-			}
-			if(notfound) thePlayer = -1;
-		}
-		if(thePlayer > ind) thePlayer--;
-		items.remove(it);
-		//Remove from drones/doors list if necessary
-		drones.remove(it);
-		if (doors.remove(it)) { //If it was a door, the drone paths should be recalculated
-			chDronePaths();
-			calcDronePaths();
-		}
-	}
-	
-	public void paintComponent(Graphics g) {
-		//First, the outer border is drawn
-		super.paintComponent(g);
-		g.setColor(Jned.TILE_FILL);
-		g.fillRect(0,0,getWidth(),cell);
-		g.fillRect(0,getHeight()-cell,getWidth(),cell);
-		g.fillRect(0,cell,cell,getHeight()-2*cell);
-		g.fillRect(getWidth()-cell,cell,cell,getHeight()-2*cell);
-		
-		//Next, each tile is drawn
-		g.setColor(Jned.TILE_FILL);
-		int tx, ty;
-		for(int i = 0; i < 31; i++) {
-			for (int j = 0; j < 23; j++) {
-				if(tiles[i][j] != 0) { //If it's empty (=0), nothing needs to be done
-					//Calculates origin of cell in question
-					tx = (i+1)*cell;
-					ty = (j+1)*cell;
-					switch (tiles[i][j]) {
-					
-						case 1: //Filled
-							g.fillRect(tx,ty,cell,cell);
-						break;
-						
-						//45 tile
-						case 2: //Q
-							{int[]	xs = {tx+cell,tx,tx+cell},
-									ys = {ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 3: //W
-							{int[]	xs = {tx,tx,tx+cell},
-									ys = {ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 4: //S
-							{int[]	xs = {tx,tx+cell,tx},
-									ys = {ty,ty,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 5: //A
-							{int[]	xs = {tx,tx+cell,tx+cell},
-									ys = {ty,ty,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						
-						//63thin tile
-						case 6: //Q
-							{int[]	xs = {tx+cell,tx+cell/2,tx+cell},
-									ys = {ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 7: //W
-							{int[]	xs = {tx,tx,tx+cell/2},
-									ys = {ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 8: //S
-							{int[]	xs = {tx,tx+cell/2,tx},
-									ys = {ty,ty,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 9: //A
-							{int[]	xs = {tx+cell/2,tx+cell,tx+cell},
-									ys = {ty,ty,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						
-						//27thin tile
-						case 10: //Q
-							{int[]	xs = {tx+cell,tx,tx+cell},
-									ys = {ty+cell/2,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 11: //W
-							{int[]	xs = {tx,tx,tx+cell},
-									ys = {ty+cell/2,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 12: //S
-							{int[]	xs = {tx,tx+cell,tx},
-									ys = {ty,ty,ty+cell/2};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						case 13: //A
-							{int[]	xs = {tx,tx+cell,tx+cell},
-									ys = {ty,ty,ty+cell/2};
-							g.fillPolygon(xs,ys,3);}
-						break;
-						
-						//concave tile
-						case 14: //Q
-							g.fillRect(tx,ty,cell,cell);
-							g.setColor(Jned.TILE_SPACE);
-							g.fillArc(tx-cell,ty-cell,cell*2-1,cell*2-1,270,90);
-							g.setColor(Jned.TILE_FILL);
-						break;
-						case 15: //W
-							g.fillRect(tx,ty,cell,cell);
-							g.setColor(Jned.TILE_SPACE);
-							g.fillArc(tx,ty-cell,cell*2-1,cell*2-1,180,90);
-							g.setColor(Jned.TILE_FILL);
-						break;
-						case 16: //S
-							g.fillRect(tx,ty,cell,cell);
-							g.setColor(Jned.TILE_SPACE);
-							g.fillArc(tx,ty,cell*2-1,cell*2-1,90,90);
-							g.setColor(Jned.TILE_FILL);
-						break;
-						case 17: //A
-							g.fillRect(tx,ty,cell,cell);
-							g.setColor(Jned.TILE_SPACE);
-							g.fillArc(tx-cell,ty,cell*2-1,cell*2-1,0,90);
-							g.setColor(Jned.TILE_FILL);
-						break;
-						
-						//half tile
-						case 18: //Q
-							g.fillRect(tx,ty,cell/2,cell);
-						break;
-						case 19: //W
-							g.fillRect(tx,ty,cell,cell/2);
-						break;
-						case 20: //S
-							g.fillRect(tx+cell/2,ty,cell/2,cell);
-						break;
-						case 21: //A
-							g.fillRect(tx,ty+cell/2,cell,cell/2);
-						break;
-						
-						//63thick tile
-						case 22: //Q
-							{int[]	xs = {tx+cell/2,tx+cell,tx+cell,tx},
-									ys = {ty,ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						case 23: //W
-							{int[]	xs = {tx,tx+cell/2,tx+cell,tx},
-									ys = {ty,ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						case 24: //S
-							{int[]	xs = {tx,tx+cell,tx+cell/2,tx},
-									ys = {ty,ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						case 25: //A
-							{int[]	xs = {tx,tx+cell,tx+cell,tx+cell/2},
-									ys = {ty,ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						
-						//27thick tile
-						case 26: //Q
-							{int[]	xs = {tx,tx+cell,tx+cell,tx},
-									ys = {ty+cell/2,ty,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						case 27: //W
-							{int[]	xs = {tx,tx+cell,tx+cell,tx},
-									ys = {ty,ty+cell/2,ty+cell,ty+cell};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						case 28: //S
-							{int[]	xs = {tx,tx+cell,tx+cell,tx},
-									ys = {ty,ty,ty+cell/2,ty+cell};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						case 29: //A
-							{int[]	xs = {tx,tx+cell,tx+cell,tx},
-									ys = {ty,ty,ty+cell,ty+cell/2};
-							g.fillPolygon(xs,ys,4);}
-						break;
-						
-						//convex tile
-						case 30: //Q
-							g.fillArc(tx,ty,cell*2,cell*2,90,90);
-						break;
-						case 31: //W
-							g.fillArc(tx-cell,ty,cell*2,cell*2,0,90);
-						break;
-						case 32: //S
-							g.fillArc(tx-cell,ty-cell,cell*2,cell*2,270,90);
-						break;
-						case 33: //A
-							g.fillArc(tx,ty-cell,cell*2,cell*2,180,90);
-						break;
-						default:
-						break;
-					}
-				}
-			}
-		}
-		//Next, the gridlines are drawn
-		if(drawGrid) {
-			for(int i = 2; i >= 0; i--) {
-				if(overlays[i] != null) {
-					if(overlays[i].isOn()) {
-						switch(i) {
-							case 0: g.setColor(Jned.PRIMARY_GRID); break;
-							case 1: g.setColor(Jned.SECONDARY_GRID); break;
-							case 2: g.setColor(Jned.TERTIARY_GRID); break;
-							default: break;
-						}
-						scratch1 = overlays[i].getPoints(true);
-						for(Integer ind : scratch1) {
-							if(ind > 0 && ind < getWidth()-2*cell-1)
-								g.drawLine(ind+cell,cell,ind+cell,getHeight()-cell-1);
-						}
-						scratch1 = overlays[i].getPoints(false);
-						for(Integer ind : scratch1) {
-							if(ind > 0 && ind < getHeight()-2*cell-1)
-								g.drawLine(cell,ind+cell,getWidth()-cell-1,ind+cell);
-						}
-					}
-				}
-			}
-		}
-		//Then, the snap points
-		if(drawSnap) {
-			if(overlays[3] != null) {
-				g.setColor(Jned.SNAP_POINTS);
-				scratch1 = overlays[3].getPoints(true);
-				scratch2 = overlays[3].getPoints(false);
-				for(Integer xind : scratch1) {
-					if(xind > 0 && xind < getWidth()-1) {
-						for(Integer yind : scratch2) {
-							if(yind > 0 && yind < getHeight()-1)
-								g.drawLine(xind,yind,xind,yind);
-						}
-					}
-				}
-			}
-		}
-		if(mouseon || cpypst.isVisible()) {
-			if(isTiles) { //Draw a square around selected tile(s)
-				g.setColor(Jned.TILE_SELECT);
-				g.drawRect((Math.min(0,dcol)+col)*cell,(Math.min(0,drow)+row)*cell,(Math.abs(dcol)+1)*cell-1,(Math.abs(drow)+1)*cell-1);
-			}
-		}
-		
-		//Draws the objects
-		for(Item it : items) {
-			it.paint(g);
-			if(mind.drawTriggers) {
-				it.paintTrigger(g);
-			}
-			if(mode < -1) {
-				for(Launchpad lp : pads) {
-					lp.paintLine(g);
-				}
-			}
-		}
-		if(mind.drawPaths) {
-			for(Drone dr : drones) {
-				dr.paintPath(g);
-			}
-		}
-		if(mouseon) {
-			if(!isTiles) {
-				if(mode == -1) {
-					if(selectBox) {//Draws the selection box, if it is being dragged
-						g.setColor(Jned.SELECTION_BOX);
-						g.drawRect(Math.min(orow,drow),Math.min(ocol,dcol),Math.abs(drow-orow),Math.abs(dcol-ocol));
-					}
-				} else {//Draws ghost (faint version of current object-to-add at snap location)
-					int type = getType(mode);
-					switch(type){
-						case 0: //Gauss turrent
-							Gaussturret.paintGhost(drow, dcol, g);
-						break;
-						case 1: //Homing launcher
-							Hominglauncher.paintGhost(drow, dcol, g);
-						break;
-						case 2: //Mine
-							Mine.paintGhost(drow, dcol, g);
-						break;
-						case 3: //Floorguard
-							Floorguard.paintGhost(drow, dcol, g);
-						break;
-						case 4: //Thwump
-							Thwump.paintGhost(drow,dcol,g);
-						break;
-						case 5: //Zap drone
-							Zapdrone.paintGhost(type,drow,dcol,(mode - Jned.ZAP)/4, g);
-						break;
-						case 6: //Seeker drone
-							Seekerdrone.paintGhost(type,drow,dcol,(mode - Jned.SEEKER)/4, g);
-						break;
-						case 7: //Laser drone
-							Laserdrone.paintGhost(type,drow,dcol,(mode - Jned.LASER)/4, g);
-						break;
-						case 8: //Chaingun drone
-							Chaingundrone.paintGhost(type,drow,dcol,(mode - Jned.CHAINGUN)/4, g);
-						break;
-						case 9: //Player
-							Player.paintGhost(drow, dcol, g);
-						break;
-						case 10: //Gold
-							Gold.paintGhost(drow,dcol,g);
-						break;
-						case 11: //Bounce block
-							Bounceblock.paintGhost(drow,dcol,g);
-						break;
-						case 12: //Exit door
-							if(swtch) {
-								Exit.paintSwitchGhost(orow,ocol,drow,dcol, g);
-							} else {
-								Exit.paintDoorGhost(drow,dcol, g);
-							}
-						break;
-						case 13: //Oneway platform
-							Oneway.paintGhost(drow,dcol,mode - Jned.ONEWAY, g);
-						break;
-						case 14: //Normal door
-							Normaldoor.paintGhost(mode-Jned.NDOOR,drow,dcol,g);
-						break;
-						case 15: //Locked door
-							if(swtch) {
-								Lockeddoor.paintSwitchGhost(drow,dcol,mode - Jned.LDOOR,orow,ocol, g);
-							} else {
-								Lockeddoor.paintDoorGhost(mode - Jned.LDOOR,drow,dcol, g);
-							}
-						break;
-						case 16: //Trap door
-							if(swtch) {
-								Trapdoor.paintSwitchGhost(drow,dcol,(mode - Jned.NDOOR)%4,orow,ocol, g);
-							} else {
-								Trapdoor.paintDoorGhost(mode - Jned.TDOOR,drow,dcol, g);
-							}
-						break;
-						case 17: //Launch pad
-							Launchpad.paintGhost(drow,dcol,mode-Jned.LAUNCH, g);
-						break;
-						default: case -1: break;
-					}
-				}
-			}
-		}
-	}
-	public void mouseEntered(MouseEvent me) {
-		mouseon = true;
-		if(grabPoint) {
-			orow = me.getX();
-			ocol = me.getY();
-			findLPreference();
-			grabPoint = false;
-		}
-		repaint();
-	}
-	public void mouseExited(MouseEvent me) {
-		mouseon = false;
-		if(isTiles) mind.unHighlight();
-		repaint();
-	}
-	
-	//Listener for menu button pushes
-	public void actionPerformed(ActionEvent ae) {
-		push(ae.getActionCommand());
-	}
-	public void push(String button) {
-		switch(button) {
-			case "copy":
-				copyTiles(false);
-			break;
-			case "paste":
-				pasteTiles();
-			break;
-			case "cut":
-				copyTiles(true);
-			break;
-			case "erase":
-				setTiles(false);
-			break;
-			case "fill":
-				setTiles(true);
-			break;
-			case "itemCopy":
-				copyItems(false);
-			break;
-			case "itemCut":
-				copyItems(true);
-			break;
-			case "itemPaste":
-				pasteItems();
-			break;
-			case "itemDelete":
-				pushDelete();
-			break;
-			case "nudgeRight":
-				nudge(1,0);
-			break;
-			case "nudgeDown":
-				nudge(0,1);
-			break;
-			case "nudgeLeft":
-				nudge(-1,0);
-			break;
-			case "nudgeUp":
-				nudge(0,-1);
-			break;
-			case "dirRight":
-				changeDirection(0);
-			break;
-			case "dirRightDown":
-				changeDirection(1);
-			break;
-			case "dirDown":
-				changeDirection(2);
-			break;
-			case "dirLeftDown":
-				changeDirection(3);
-			break;
-			case "dirLeft":
-				changeDirection(4);
-			break;
-			case "dirLeftUp":
-				changeDirection(5);
-			break;
-			case "dirUp":
-				changeDirection(6);
-			break;
-			case "dirRightUp":
-				changeDirection(7);
-			break;
-			case "surfCW":
-				changeBehavior(0);
-			break;
-			case "surfCCW":
-				changeBehavior(1);
-			break;
-			case "dumbCW":
-				changeBehavior(2);
-			break;
-			case "dumbCCW":
-				changeBehavior(3);
-			break;
-			case "alt":
-				changeBehavior(4);
-			break;
-			case "rand":
-				changeBehavior(5);
-			break;
-			case "none":
-				changeBehavior(6);
-			break;
-			case "activePlayer":
-				setActivePlayer();
-			break;
-			case "launchPower":
-				setMode(-2);
-				findLaunchpads();
-			break;
-			case "launchDir":
-				setMode(-3);
-				findLaunchpads();
-			break;
-			case "launchPowDir":
-				setMode(-4);
-				findLaunchpads();
-			break;
-			default: break;
-		}
-	}
-	//Nudges items (either full selection, or item under mouse) position(s) by given amount
-	public void nudge(int xamount, int yamount) {
-		if(selection.size() > 0) {
-			for(Item it : selection) {
-				it.setDelta(orow, ocol);
-				it.moveRelative(orow+xamount,ocol+yamount);
-			}
-		} else {
-			if(rclick != null) {
-				if(rclick.getType() == 15 || rclick.getType() == 16) {
-					if(!((SwitchDoor)rclick).overlapsDoor(orow,ocol)) rclick.moveTo(rclick.getX()+xamount,rclick.getY()+yamount);
-				} else {
-					rclick.moveTo(rclick.getX()+xamount,rclick.getY()+yamount);
-				}
-			}
-		}
-		mind.updateText(outputLevel());
-	}
-	//Changes direction of items (either full selection, or item under mouse) to given value
-	public void changeDirection(int newDir) {
-		if(selection.size() > 0) {
-			for(Item it : selection) {
-				if(	(it.getType() >= 4 && it.getType() <= 8) ||
-					(it.getType() >= 13 && it.getType() <=16) ) {
-					((DirectionalItem)it).setDirection(newDir/2);
-				}
-				if(it.getType()==17) ((Launchpad)it).setDirection(newDir*2*Math.PI/8.0);
-			}
-		} else {
-			if (rclick != null) {
-				if(	(rclick.getType() >= 4 && rclick.getType() <= 8) ||
-					(rclick.getType() >= 13 && rclick.getType() <=16) ) {
-					((DirectionalItem)rclick).setDirection(newDir/2);
-				}
-				if(rclick.getType()==17) {
-					((Launchpad)rclick).setDirection(newDir*2*Math.PI/8.0);
-				}
-			}
-		}
-		chDronePaths();
-		calcDronePaths();
-		mind.updateText(outputLevel());
-	}
-	//Changes the behavior of selected (or under-mouse) drones to given value
-	public void changeBehavior(int newBeh) {
-		if(selection.size() > 0) {
-			for(Item it : selection) {
-				if(it.getType() >= 5 && it.getType() <= 8) {
-					((Drone)it).setBehavior(newBeh);
-				}
-			}
-		} else {
-			if (rclick != null) {
-				if(rclick.getType() >= 5 && rclick.getType() <= 8) {
-					((Drone)rclick).setBehavior(newBeh);
-				}
-			}
-		}
-		chDronePaths();
-		calcDronePaths();
-		mind.updateText(outputLevel());
-	}
-	//Sets the selected (or under-mouse) player to be the active player
-	public void setActivePlayer() {
-		if(selection.size() > 0) {
-			for(Item it : selection) {
-				if(it.getType() == 9) {
-					thePlayer = items.indexOf(it);
-				}
-			}
-		} else {
-			if (rclick != null) {
-				if(rclick.getType() == 9) {
-					thePlayer = items.indexOf(rclick);
-				}
-			}
-		}
-		mind.updateText(outputLevel());
-	}
-	//Finds all launchpads selected (or under-mouse) for launchpad edit mode and places them in an array
-	public void findLaunchpads() {
-		pads.clear();
-		if(selection.size() > 0) {
-			for(Item it : selection) {
-				if(it.getType() == 17) {
-					pads.add((Launchpad)it);
-				}
-			}
-		} else {
-			if (rclick != null) {
-				if(rclick.getType() == 17) {
-					pads.add((Launchpad)rclick);
-				}
-			}
-		}
-		grabPoint = true; 	//Makes it so that the mouse coordinates will be saved to orow/ocol immediately after the right-click menu closes
-	}						// This is accomplished using the mouseOn() method
-	public void findLPreference() { //Part 2 of findLaunchpads(): runs after the mouse coordinates have been grabbed
-		drow = orow - (int)(pads.get(0).getPowerX()*24); 	//Sets the reference point. All mouse move events will use this point as the origin to
-		dcol = ocol - (int)(pads.get(0).getPowerY()*24); 	// calculate the new power/direction to set launchpads to. It is originally set to where the
-															// position of the (first) launchpad would be if the mouse was at the peak of its power/direction line.
-		
-	}
+/**
+ * LevelArea is a panel displaying the level in Jned. It contains all the level items and tile 
+ * data. All manipulation of level items is done through LevelArea. Also, LevelArea contains
+ * pop-up menus for the objects.
+ * @author James Porter
+ */
+public class LevelArea extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
+  private Jned jned;
+  private TextBox textBox;
+  private KeySignature keys;
+  
+  private int cellSize;
+  
+  // Mode variables  
+  private boolean isTiles;
+  private int mode;
+  // -1 represents selection mode
+  // Item editing mode fields - skipped numbers are for different directions/behaviors
+  public static final int GAUSS = 0;
+  public static final int HOMING = 1;
+  public static final int MINE = 2;
+  public static final int FLOOR = 3;
+  public static final int THWUMP = 4;
+  public static final int ZAP = 8;
+  public static final int SEEKER = 36;
+  public static final int LASER = 64;
+  public static final int CHAINGUN = 92;
+  public static final int PLAYER = 120;
+  public static final int GOLD = 121;
+  public static final int BOUNCE = 122;
+  public static final int EXIT = 123;
+  public static final int ONEWAY = 124;
+  public static final int NDOOR = 128;
+  public static final int LDOOR = 132;
+  public static final int TDOOR = 136;
+  public static final int LAUNCH = 140;
+  // Tile editing mode values - these also match the values in the tiles array, and the indices in
+  // the charvals array (for converting tile data to n code)
+  /*
+  Q   W   S   A   TILE
+  0               empty
+  1               filled
+  2   3   4   5   45 degree
+  6   7   8   9   63 degree thin
+  10  11  12  13  27 degree thin
+  14  15  16  17  concave curve
+  18  19  20  21  half tile
+  22  23  24  25  63 degree thick
+  26  27  28  29  27 degree thick
+  30  31  32  33  convex curve
+  */
+  private final char[] charvals = {'0', '1', '3', '2', '5', '4', 'G', 'F', 'I', 'H', '?', '>', 'A',
+      '@', '7', '6', '9', '8', 'Q', 'P', 'O', 'N', 'K', 'J', 'M', 'L', 'C', 'B', 'E', 'D', ';',
+      ':', '=', '<'};
+      
+  private int[][] tiles;
+  private ArrayList<Item> items;
+  // Sub-lists
+  private ArrayList<Door> doors;
+  private ArrayList<Drone> drones;
+  private ArrayList<Launchpad> launchPads;
+  private int[] itemIndices; // Positions of item data in text box
+  private int thePlayer;
+  // Clipboard
+  private ArrayList<Item> selection;
+  private int[][] tileClipboard;
+  private ArrayList<Item> itemClipboard;
+  private int clipboardAverageX;
+  private int clipboardAverageY;
+  
+  // Mouse state variables
+  private int mouseRow;
+  private int mouseColumn;
+  private int deltaRow; // Multi-use: TILE MODE = drag box width/height; ITEM SELECTION MODE = 
+  private int deltaColumn; // opposite corner of drag box; ITEM ADDING MODE = adjusted add point
+  private int originRow; // Multi-use: TILE MODE = drag box origin; ITEM MODE = drag box origin or
+  private int originColumn; // right-click coordinate
+  
+  private boolean mouseOn;
+  private int buttonDown; // 0 = none, 1 = left button, 2 = right button
+  private boolean dragged;
+  private boolean drawingSelectionBox;
+  private Item lastItem;
+  private Item rightClickedItem;
+  private boolean snapTo;
+  private boolean addingSwitch;
+  private boolean grabPoint; // TASK - get rid of this
+  
+  // Menus
+  private JPopupMenu copyPasteMenu;
+  private JPopupMenu itemMenu;
+  private JMenuItem[] menuItems;
+  
+  // Drawing variables
+  private boolean drawingTriggers;
+  private boolean drawingDronePaths;
+  private boolean drawingGrid;
+  private boolean drawingSnapPoints;
+  
+  // Grid/snap
+  private Overlay[] overlays;
+  private ArrayList<Integer> scratch1;
+  private ArrayList<Integer> scratch2;
+  
+  /**
+   * Create an instance of LevelArea.
+   * @param x the x coordinate
+   * @param y the y coordinate
+   * @param width the width
+   * @param height the height
+   * @param squareSize the length of one side of an N tile
+   * @param jned a reference to the associated Jned instance
+   */
+  public LevelArea (int x, int y, int width, int heigth, int squareSize, Jned jned,
+      KeySignature keys) {
+    setLayout(null);
+    setBounds(x, y, width, heigth);
+    setBackground(Colors.TILE_SPACE);
+    addMouseListener(this);
+    addMouseMotionListener(this);
+    
+    cellSize = squareSize;
+    this.jned = jned;
+    this.keys = keys;
+    
+    tiles = new int[31][23];
+    items = new ArrayList<Item>();
+    doors = new ArrayList<Door>();
+    drones = new ArrayList<Drone>();
+    launchPads = new ArrayList<Launchpad>();
+    thePlayer = -1;
+    selection = new ArrayList<Item>();
+    itemClipboard = new ArrayList<Item>();
+    clipboardAverageX = 0;
+    clipboardAverageY = 0;
+    
+    isTiles = true;
+    mode = -1;
+    
+    mouseRow = 0;
+    mouseColumn = 0;
+    deltaRow = 0;
+    deltaColumn = 0;
+    mouseOn = false;
+    buttonDown = 0;
+    dragged = false;
+    lastItem = null;
+    rightClickedItem = null;
+    addingSwitch = false;
+    grabPoint = false;
+    
+    // Tile copy/paste drop-down menu
+    copyPasteMenu = new JPopupMenu();
+    JMenuItem miCut = makeJMenuItem("Cut", "cut");
+    JMenuItem miCopy = makeJMenuItem("Copy", "copy");
+    JMenuItem miPaste = makeJMenuItem("Paste", "paste");
+    JMenuItem miErase = makeJMenuItem("Erase", "erase");
+    JMenuItem miFill = makeJMenuItem("Fill", "fill");
+    copyPasteMenu.add(miCut);
+    copyPasteMenu.add(miCopy);
+    copyPasteMenu.add(miPaste);
+    copyPasteMenu.add(miErase);
+    copyPasteMenu.add(miFill);
+    
+    // Item drop-down menu
+    menuItems = new JMenuItem[11];
+    itemMenu = new JPopupMenu();
+    menuItems[0] = makeJMenuItem("Cut", "itemCut");
+    menuItems[1] = makeJMenuItem("Copy", "itemCopy");
+    menuItems[2] = makeJMenuItem("Paste", "itemPaste");
+    menuItems[3] = makeJMenuItem("Delete", "itemDelete");
+    JMenu nudgeMenu = new JMenu("Nudge");
+    JMenuItem nuR = makeJMenuItem("right", "nudgeRight");
+    JMenuItem nuD = makeJMenuItem("down", "nudgeDown");
+    JMenuItem nuL = makeJMenuItem("left", "nudgeLeft");
+    JMenuItem nuU = makeJMenuItem("up", "nudgeUp");
+    nudgeMenu.add(nuR);
+    nudgeMenu.add(nuD);
+    nudgeMenu.add(nuL);
+    nudgeMenu.add(nuU);
+    menuItems[4] = nudgeMenu;
+    JMenu halfNudgeMenu = new JMenu("Nudge");
+    JMenuItem hfnuR = makeJMenuItem("right", "nudgeRight");
+    JMenuItem hfnuL = makeJMenuItem("left", "nudgeLeft");
+    halfNudgeMenu.add(hfnuR);
+    halfNudgeMenu.add(hfnuL);
+    menuItems[5] = halfNudgeMenu;
+    JMenu direct = new JMenu("Direction");
+    JMenuItem dirR = makeJMenuItem("right", "dirRight");
+    JMenuItem dirD = makeJMenuItem("down", "dirDown");
+    JMenuItem dirL = makeJMenuItem("left", "dirLeft");
+    JMenuItem dirU = makeJMenuItem("up", "dirUp");
+    direct.add(dirR);
+    direct.add(dirD);
+    direct.add(dirL);
+    direct.add(dirU);
+    menuItems[6] = direct;
+    JMenu direct8 = new JMenu("Direction");
+    JMenuItem dirR8 = makeJMenuItem("right", "dirRight");
+    JMenuItem dirRD8 = makeJMenuItem("right/down", "dirRightDown");
+    JMenuItem dirD8 = makeJMenuItem("down", "dirDown");
+    JMenuItem dirLD8 = makeJMenuItem("down/left", "dirLeftDown");
+    JMenuItem dirL8 = makeJMenuItem("left", "dirLeft");
+    JMenuItem dirLU8 = makeJMenuItem("left/up", "dirLeftUp");
+    JMenuItem dirU8 = makeJMenuItem("up", "dirUp");
+    JMenuItem dirRU8 = makeJMenuItem("up/right", "dirRightUp");
+    direct8.add(dirR8);
+    direct8.add(dirRD8);
+    direct8.add(dirD8);
+    direct8.add(dirLD8);
+    direct8.add(dirL8);
+    direct8.add(dirLU8);
+    direct8.add(dirU8);
+    direct8.add(dirRU8);
+    menuItems[7] = direct8;
+    JMenu behav = new JMenu("Behavior");
+    JMenuItem behSCW = makeJMenuItem("Surface-follow Clockwise", "surfCW");
+    JMenuItem behSCCW = makeJMenuItem("Surface-follow Counter-clockwise", "surfCCW");
+    JMenuItem behDCW = makeJMenuItem("Dumb Clockwise", "dumbCW");
+    JMenuItem behDCCW = makeJMenuItem("Dumb Counter-clockwise", "dumbCCW");
+    JMenuItem behALT = makeJMenuItem("Alternating", "alt");
+    JMenuItem behRAND = makeJMenuItem("Quasi-random", "rand");
+    JMenuItem behNONE = makeJMenuItem("None (still)", "none");
+    behav.add(behSCW);
+    behav.add(behSCCW);
+    behav.add(behDCW);
+    behav.add(behDCCW);
+    behav.add(behALT);
+    behav.add(behRAND);
+    behav.add(behNONE);
+    menuItems[8] = behav;
+    menuItems[9] = makeJMenuItem("Set to Active Player", "activePlayer");
+    JMenu launch = new JMenu("Launchpad options");
+    JMenuItem lauPow = makeJMenuItem("Power", "launchPower");
+    JMenuItem lauDir = makeJMenuItem("Free direction", "launchDir");
+    JMenuItem lauPD = makeJMenuItem("Power/direction", "launchPowDir");
+    launch.add(lauPow);
+    launch.add(lauDir);
+    launch.add(lauPD);
+    menuItems[10] = launch;
+    
+    drawingTriggers = false;
+    drawingDronePaths = false;
+    
+    overlays = new Overlay[4];
+    scratch1 = null;
+    scratch2 = null;
+  }
+  private JMenuItem makeJMenuItem(String label, String command) {
+    JMenuItem menuItem = new JMenuItem(label);
+    menuItem.addActionListener(this);
+    menuItem.setActionCommand(command);
+    return menuItem;
+  }
+  
+  /**
+   * Returns the boolean 'tiles/items' portion of the current editing mode.
+   * @return true when in tiles mode, false when in items/enemies mode
+   */
+  public boolean getBoolMode() {
+    return isTiles;
+  }
+  /**
+   * Returns the integer portion of the current editing mode, corresponding to one of the item
+   * adding mode fields, one of the tile mode values, or -1 for selection mode.
+   * @return the integer value of the current editing mode
+   */
+  public int getIntMode() {
+    return mode;
+  }
+  /**
+   * Sets the current editing mode.
+   * @param mode integer value of editing mode
+   * @param isTiles boolean value of editing mode
+   */
+  public void setMode(int mode, boolean isTiles) {
+    setMode(isTiles);
+    setMode(mode);
+  }
+  /**
+   * Sets the current editing mode integer value.
+   * @param mode integer value of editing mode
+   */
+  public void setMode(int mode) {
+    this.mode = mode;
+    addingSwitch = false;
+  }
+  /**
+   * Sets the current editing mode boolean value
+   * @param isTiles boolean value of editing mode. True for tile mode, false for item/enemy mode.
+   */
+  public void setMode(boolean isTiles) {
+    this.isTiles = isTiles;
+    
+    // Any dragged selection is cancelled
+    if(isTiles) clearSelection();
+    deltaRow = 0;
+    deltaColumn = 0;
+    originRow = 0;
+    originColumn = 0;
+    
+    setMode(-1);
+  }
+  
+  /**
+   * Returns whether triggers are being drawn.
+   * @return true when triggers are being drawn, false otherwise
+   */
+  public boolean drawingTriggers () {
+    return drawingTriggers;
+  }
+  
+  /**
+   * Sets value of whether to draw triggers.
+   * @param isDrawingTriggers boolean value, true to draw triggers, false to stop drawing
+   */
+  public void setDrawTriggers (boolean isDrawingTriggers) {
+    drawingTriggers = isDrawingTriggers;
+  }
+  
+  /**
+   * Returns whether drone paths are being drawn.
+   * @return true when drone paths are being drawn, false otherwise
+   */
+  public boolean drawingDronePaths () {
+    return drawingDronePaths;
+  }
+    
+  /**
+   * Sets value of whether to draw drone paths.
+   * @param isDrawingDronePaths boolean value, true to draw drone paths, false to stop drawing
+   */
+  public void setDrawDronePaths (boolean isDrawingDronePaths) {
+    drawingDronePaths = isDrawingDronePaths;
+  }
+  
+  /**
+   * Returns whether the grid is being drawn.
+   * @return true when grid is being drawn, false otherwise
+   */
+  public boolean drawingGrid() {
+    return drawingGrid;
+  }
+    
+  /**
+   * Sets value of whether to draw the grid.
+   * @param isDrawingGrid boolean value, true to draw grid, false to stop drawing
+   */
+  public void setDrawGrid (boolean isDrawingGrid) {
+    drawingGrid = isDrawingGrid;
+  }
+  
+  /**
+   * Returns whether the snap points are being drawn.
+   * @return true when snap points are being drawn, false otherwise
+   */
+  public boolean drawingSnapPoints() {
+    return drawingSnapPoints;
+  }
+  
+  /**
+   * Sets value of whether to draw snap points.
+   * @param isDrawingSnapPoints boolean value, true to draw snap points, false to stop drawing
+   */
+  public void setDrawSnapPoints (boolean isDrawingSnapPoints) {
+    drawingSnapPoints = isDrawingSnapPoints;
+  }
+  
+  /**
+   * Returns whether snapping is turned on.
+   * @return true when snapping is turned on, false otherwise
+   */
+  public boolean isSnappingOn() {
+    return snapTo;
+  }
+  
+  /**
+   * Sets snapping to on or off.
+   * @param isOn true to turn on snapping, false otherwise
+   */
+  public void setSnapping (boolean isOn) {
+    snapTo = isOn;
+  }  
+  
+  // Edits tile data according to already-stored mouse position and mode information
+  private void edit() {
+    for (int i = Math.min(mouseColumn, mouseColumn + deltaColumn) - 1; i < Math.max(mouseColumn,
+        mouseColumn + deltaColumn); i++) {
+      for (int j = Math.min(mouseRow, mouseRow + deltaRow) - 1; j < Math.max(mouseRow, mouseRow +
+          deltaRow); j++) {
+        if (keys.isShiftPushed()) {
+          if (mode > 1) {
+            tiles[i][j] = (mode > 17 ? mode - 16 : mode + 16);
+          } else {
+            tiles[i][j] = 1 - mode;
+          }
+        } else {
+          tiles[i][j] = mode;
+        }
+        recalculateDronePaths();
+      }
+    }
+  }
+  
+  // Puts together options that should appear on drop-down menu, based on flag parameters
+  private void compileMenu(int flags) {
+    for (JMenuItem  mi : menuItems) {
+      itemMenu.remove(mi);
+    }
+    
+    if(selection.size() > 0 || rightClickedItem != null) { // Copy, cut
+      itemMenu.add(menuItems[0]);
+      itemMenu.add(menuItems[1]);
+    }
+    if(itemClipboard.size() > 0) { // Paste
+      itemMenu.add(menuItems[2]);
+    }
+    if(selection.size() > 0 || rightClickedItem != null) { // Delete
+      itemMenu.add(menuItems[3]);
+    }
+    if((flags & 0b000001) > 0) { // Nudge
+      itemMenu.add(menuItems[4]);
+    }
+    if((flags & 0b000010) > 0 && (flags & 0b000001) == 0) { // Half nudge
+      itemMenu.add(menuItems[5]);
+    }
+    if((flags & 0b000100) > 0) { // Direction
+      itemMenu.add(menuItems[6]);
+    }
+    if((flags & 0b100000) > 0) { // 8 directions
+      itemMenu.remove(menuItems[6]);
+      itemMenu.add(menuItems[7]);
+    }
+    if((flags & 0b001000) > 0) { // Behavior
+      itemMenu.add(menuItems[8]);
+    }
+    if((flags & 0b010000) > 0) { // Active player
+      int playerCount = 0;
+      int playerIndex = -1;
+      for (Item item : selection) {
+        if(item.getType() == 9) {
+          playerCount++;
+          playerIndex = items.indexOf(item);
+        }
+      }
+      // This menu item is only shown when 1 player is selected, and it is not active
+      if(playerCount <= 1) {
+        if(playerCount == 0) {
+          playerIndex = items.indexOf(rightClickedItem); 
+        }
+        if(thePlayer != playerIndex) {
+          itemMenu.add(menuItems[9]);
+        }
+      }
+    }
+    if((flags & 0b100000) > 0) { // Launchpad
+      itemMenu.add(menuItems[10]);
+    }
+  }
+  
+  /**
+   * Returns a String version of the level, formatted as useable n level data ready to be pasted
+   * into the game.
+   * @return String of current level data, in n code
+   */
+  public String outputLevel() {
+    // Tiles
+    char[] tileString = new char[713];
+    for (int c = 0; c < 31; c++) {
+      for (int r = 0; r < 23; r++) {
+        tileString[r + 23 * c] = charvals[tiles[c][r]];
+      }
+    }
+    String result = new String(tileString) + "|";
+    
+    // Items
+    String things = "";
+    itemIndices = new int[items.size()];
+    int position = 0;
+    // Active player is always the first item listed in n code
+    if (thePlayer >= 0) {
+      things += items.get(thePlayer).toString() + (items.size() > 1 ? "!" : "");
+      itemIndices[thePlayer] = position;
+      position = things.length();
+    }
+    for (int i = 0; i < items.size(); i++) {
+      if (i != thePlayer) {
+        things += items.get(i).toString() + (i == items.size() - 1 ? "" : "!");
+        itemIndices[i] = position;
+        position = things.length();
+      }
+    }
+    return result + things;
+  }
+  
+  /**
+   * Loads a level into LevelArea from a String of properly formatted n level data.
+   * @param data the String of level data to load
+   */
+  public void inputLevel (String data) {
+    // Tiles
+    String charvalsString = new String(charvals);
+    for (int c = 0; c < 31; c++) {
+      for (int r = 0; r < 23; r++) {
+        tiles[c][r] = charvalsString.indexOf(data.charAt(r + 23 * c));
+      }
+    }
+    
+    // Items
+    items.clear();
+    selection.clear();
+    drones.clear();
+    doors.clear();
+    thePlayer = -1;
+    if(data.length() > 714) {
+      String[] itemCodes = data.substring(714).split("!");
+      String[] itemType;
+      String[] stringParameters;
+      double[] parameters;
+      for(String item : itemCodes) {
+        itemType = item.split("\\^");
+        stringParameters = itemType[1].split(",");
+        parameters = new double[stringParameters.length];
+        for(int i = 0; i < stringParameters.length; i++) {
+          parameters[i] = Double.parseDouble(stringParameters[i]);
+        }
+        Item anItem = null;
+        switch (itemType[0]) {
+          case "0": // Gold
+            anItem = new Gold(jned, (int) parameters[0], (int) parameters[1]);
+            break;
+          case "1": // Bounce block
+            anItem = new Bounceblock(jned, (int) parameters[0], (int) parameters[1]);
+            break;
+          case "2": // Launch pad
+            anItem = new Launchpad(jned, (int) parameters[0], (int) parameters[1], parameters[2],
+                parameters[3]);
+            break;
+          case "3": // Gauss turret
+            anItem = new Gaussturret(jned, (int) parameters[0], (int) parameters[1]);
+            break;
+          case "4": // Floor guard
+            anItem = new Floorguard(jned, (int) parameters[0], (int) parameters[1]);
+            break;
+          case "5": // Player
+            anItem = new Player(jned, (int) parameters[0], (int) parameters[1]);
+            thePlayer = 0;
+            break;
+          case "6": // Drone
+            if (parameters[3] == 1) { // Seeker
+              anItem = new Seekerdrone(jned, (int) parameters[0], (int) parameters[1],
+                  (int) parameters[5], (int) parameters[2]);
+            } else {
+              switch((int) parameters[4]) {
+                default:
+                  // fall through
+                case 0: // Zap
+                  anItem = new Zapdrone(jned, (int) parameters[0], (int) parameters[1],
+                      (int) parameters[5], (int) parameters[2]);
+                  break;
+                case 1: // Laser
+                  anItem = new Laserdrone(jned, (int) parameters[0], (int) parameters[1],
+                      (int) parameters[5], (int) parameters[2]);
+                  break;
+                case 2: // Chaingun
+                  anItem = new Chaingundrone(jned, (int) parameters[0], (int) parameters[1],
+                      (int) parameters[5], (int) parameters[2]);
+                  break;
+              }
+            }
+            drones.add((Drone) anItem);
+            break;
+          case "7": // Oneway platform
+            anItem = new Oneway(jned, (int) parameters[0], (int) parameters[1],
+                (int) parameters[2]);
+            break;
+          case "8": // Thwump
+            anItem = new Thwump(jned, (int) parameters[0], (int) parameters[1],
+                (int) parameters[2]);
+            break;
+          case "9": // Door
+            int direction = (int) parameters[2];
+            if (parameters[7] == -1) {
+              direction = 2;
+            }
+            if (parameters[8] == -1) {
+              direction = 3;
+            }
+            if (parameters[3] == 1) { // Trap
+              anItem = new Trapdoor(jned, (int) parameters[0], (int) parameters[1], direction,
+                  (int) parameters[4], (int) parameters[5]);
+            } else {
+              if (parameters[6] == 1) { // Locked
+                anItem = new Lockeddoor(jned, (int) parameters[0], (int) parameters[1], direction,
+                    (int) parameters[4], (int) parameters[5]);
+              } else { // Normal
+                anItem = new Normaldoor(jned, direction, (int) parameters[4], (int) parameters[5]);
+              }
+            }
+            doors.add((Door) anItem);
+            break;
+          case "10": // Homing launcher
+            anItem = new Hominglauncher(jned, (int) parameters[0], (int) parameters[1]);
+            break;
+          case "11": // Exit
+            anItem = new Exit(jned, (int) parameters[0], (int) parameters[1], (int) parameters[2],
+                (int) parameters[3]);
+            break;
+          case "12": // Mine
+            anItem = new Mine(jned, (int) parameters[0], (int) parameters[1]);
+            break;
+          default:
+        }
+        if(anItem != null) {
+          items.add(anItem);
+        }
+      }
+    }
+    jned.updateText(outputLevel());
+    recalculateDronePaths();
+    calculateDronePaths();
+  }
+  
+  // ACTIONS
+  public void actionPerformed(ActionEvent ae) {
+    push(ae.getActionCommand());
+  }
+  /**
+   * Performs actions that should result from pushing a button or menu item with the given name or
+   * action command. Right click menu items route through this method, as do many actions numbers
+   * in Jned.
+   * @param button action command String 
+   */
+  public void push(String button) {
+    switch(button) {
+      case "copy":
+        copyTiles(false);
+        break;
+      case "paste":
+        pasteTiles();
+        break;
+      case "cut":
+        copyTiles(true);
+        break;
+      case "erase":
+        setTiles(false);
+        break;
+      case "fill":
+        setTiles(true);
+        break;
+      case "itemCopy":
+        copyItems(false);
+        break;
+      case "itemCut":
+        copyItems(true);
+        break;
+      case "itemPaste":
+        pasteItems();
+        break;
+      case "itemDelete":
+        pushDelete();
+        break;
+      case "nudgeRight":
+        nudge(1, 0);
+        break;
+      case "nudgeDown":
+        nudge(0, 1);
+        break;
+      case "nudgeLeft":
+        nudge(-1, 0);
+        break;
+      case "nudgeUp":
+        nudge(0, -1);
+        break;
+      case "dirRight":
+        changeDirection(0);
+        break;
+      case "dirRightDown":
+        changeDirection(1);
+        break;
+      case "dirDown":
+        changeDirection(2);
+        break;
+      case "dirLeftDown":
+        changeDirection(3);
+        break;
+      case "dirLeft":
+        changeDirection(4);
+        break;
+      case "dirLeftUp":
+        changeDirection(5);
+        break;
+      case "dirUp":
+        changeDirection(6);
+        break;
+      case "dirRightUp":
+        changeDirection(7);
+        break;
+      case "surfCW":
+        changeBehavior(0);
+        break;
+      case "surfCCW":
+        changeBehavior(1);
+        break;
+      case "dumbCW":
+        changeBehavior(2);
+        break;
+      case "dumbCCW":
+        changeBehavior(3);
+        break;
+      case "alt":
+        changeBehavior(4);
+        break;
+      case "rand":
+        changeBehavior(5);
+        break;
+      case "none":
+        changeBehavior(6);
+        break;
+      case "activePlayer":
+        setActivePlayer();
+        break;
+      case "launchPower":
+        setMode(-2);
+        findLaunchpads();
+        break;
+      case "launchDir":
+        setMode(-3);
+        findLaunchpads();
+        break;
+      case "launchPowDir":
+        setMode(-4);
+        findLaunchpads();
+        break;
+    }
+  }
+    
+  /**
+   * In tile mode, expands selection box to whole level. In items/enemies mode, selects every
+   * item in the level.
+   */
+  public void selectAll() {
+    if (mode == -1) {
+      if (isTiles) {
+        deltaColumn = 30;
+        deltaRow = 22;
+        borderCheck();
+      } else {
+        clearSelection();
+        for(Item item : items) {
+          selection.add(item);
+          int type = item.getType();
+          if (type == 12 ) {
+            ((Exit) item).setSelect(true, true);
+          } else {
+            if (type == 15 || type == 16) {
+              ((SwitchDoor) item).setSelect(true, true);
+            } else {
+              item.setSelect(true);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  private void copyTiles (boolean isCut) {
+    tileClipboard = new int[Math.abs(deltaColumn) + 1][Math.abs(deltaRow) + 1];
+    originColumn = Math.min(mouseColumn, mouseColumn + deltaColumn) - 1;
+    originRow = Math.min(mouseRow, mouseRow + deltaRow) - 1;
+    for (int i = 0; i < tileClipboard.length; i++) {
+      for (int j = 0; j < tileClipboard[0].length; j++) {
+        tileClipboard[i][j] = tiles[originColumn + i][originRow + j];
+        if (isCut) {
+          tiles[originColumn + i][originRow + j] = 0;
+        }
+      }
+    }
+    if(isCut) {
+      jned.updateText(outputLevel());
+      recalculateDronePaths();
+      calculateDronePaths();
+    }
+  }
+
+  private void pasteTiles() {
+    if (tileClipboard != null) {
+      originColumn = Math.min(mouseColumn, mouseColumn + deltaColumn) - 1;
+      originRow = Math.min(mouseRow, mouseRow + deltaRow) - 1;
+      for (int i = 0; i <= Math.abs(deltaColumn); i++) {
+        for (int j = 0; j <= Math.abs(deltaRow); j++) {
+          tiles[originColumn + i][originRow + j] = tileClipboard[i % tileClipboard.length][j % 
+               tileClipboard[0].length];
+        }
+      }
+      jned.updateText(outputLevel());
+      recalculateDronePaths();
+      calculateDronePaths();
+    }
+  }
+  
+  private void copyItems(boolean isCut) {
+    if (selection.size() == 0) {
+      if (rightClickedItem != null) {
+        itemClipboard.clear();
+        itemClipboard.add(rightClickedItem.duplicate());
+        if (rightClickedItem.getType() == 12) {
+          Exit exit = (Exit) rightClickedItem;
+          clipboardAverageX = (exit.getSuperX() + exit.getSwitchX()) / 2;
+          clipboardAverageY = (exit.getSuperY() + exit.getSwitchY()) / 2;
+        } else {
+          if (rightClickedItem.getType() == 15 || rightClickedItem.getType() == 16) {
+            SwitchDoor switchDoor = (SwitchDoor) rightClickedItem;
+            int dir = switchDoor.getDirection();
+            clipboardAverageX = (switchDoor.getSuperX() + 24 * switchDoor.getRow() + (dir == 0 ? 
+                24 : (dir == 2 ? 0 : 12))) / 2;
+            clipboardAverageY = (switchDoor.getSuperY() + 24 * switchDoor.getColumn() + (dir == 1
+                ? 24 : (dir == 3 ? 0 : 12))) / 2;
+          } else {
+            clipboardAverageX = rightClickedItem.getX();
+            clipboardAverageY = rightClickedItem.getY();
+          }
+        }
+        if(isCut) {
+          selection.add(rightClickedItem);
+          pushDelete();
+        }
+      }
+    } else {
+      itemClipboard.clear();
+      int tot = 0;
+      clipboardAverageX = 0;
+      clipboardAverageY = 0;
+      for (Item item : selection) { 
+        itemClipboard.add(item.duplicate());
+        tot++;
+        if (item.getType() == 12) {
+          Exit exit = (Exit) item;
+          clipboardAverageX += exit.getSuperX() + exit.getSwitchX();
+          clipboardAverageY += exit.getSuperY() + exit.getSwitchY();
+          tot++;
+        } else {
+          if (item.getType() == 15 || item.getType() == 16) {
+            SwitchDoor switchDoor = (SwitchDoor) item;
+            int dir = switchDoor.getDirection();
+            clipboardAverageX += switchDoor.getSuperX() + 24 * switchDoor.getRow() + (dir == 0 ?
+                24 : (dir == 2 ? 0 : 12));
+            clipboardAverageY += switchDoor.getSuperY() + 24 * switchDoor.getColumn() + (dir == 1
+                ? 24 : (dir == 3 ? 0 : 12));
+            tot++;
+          } else {
+            clipboardAverageX += item.getX();
+            clipboardAverageY += item.getY();
+          }
+        }
+      }
+      clipboardAverageX /= tot;
+      clipboardAverageY /= tot;
+    
+      if (isCut) {
+        pushDelete();
+      }
+    }
+  }
+  
+  private void pasteItems() {
+    clearSelection();
+    Item anItem;
+    for (Item item : itemClipboard) {
+      anItem = item.duplicate();
+      items.add(anItem);
+      selection.add(anItem);
+      if (anItem.getType() == 12) {
+        ((Exit) anItem).setSelect(true, true);
+      } else {
+        if (anItem.getType() == 15 || anItem.getType() == 16) {
+          ((SwitchDoor) anItem).setSelect(true, true);
+        } else {
+          anItem.setSelect(true);
+        }
+      }
+      if (anItem.getType() == 9) {
+        thePlayer = items.size() - 1;
+      }
+      anItem.setDelta(clipboardAverageX, clipboardAverageY);
+      anItem.moveRelative(originRow, originColumn);
+      
+      if(anItem.getType() == 14 || anItem.getType() == 15 || anItem.getType() == 16) {
+        doors.add((Door)anItem);
+      }
+      if(anItem.getType() == 5 || anItem.getType() == 6 || anItem.getType() == 7 ||
+          anItem.getType() == 8) {
+        drones.add((Drone)anItem);
+      }
+    }
+    
+    jned.updateText(outputLevel());
+    recalculateDronePaths();
+    calculateDronePaths();
+  }
+  
+  /**
+   * Sets all selected tiles to either filled or empty.
+   * @param fill true to fill tiles, false to erase them
+   */
+  public void setTiles (boolean fill) {
+    originColumn = Math.min(mouseColumn, mouseColumn + deltaColumn) - 1;
+    originRow = Math.min(mouseRow, mouseRow + deltaRow) - 1;
+    for (int i = 0; i <= Math.abs(deltaColumn); i++) {
+      for (int j = 0; j <= Math.abs(deltaRow); j++) {
+        tiles[originColumn + i][originRow + j] = (fill ? 1 : 0);
+      }
+    }
+    jned.updateText(outputLevel());
+    recalculateDronePaths();
+    calculateDronePaths();
+  }
+  
+  /**
+   * Signals all drone objects that their paths are invalid and need to be recalculated.
+   */
+  public void recalculateDronePaths() {
+    for (Drone drone : drones) {
+      drone.recalculatePath();
+    }
+  }
+  
+  /**
+   * Signals all drone objects to recalculate their paths if they are invalid.
+   */
+  private void calculateDronePaths() {
+    for (Drone drone : drones) {
+      drone.calculatePath(tiles, doors);
+    }
+  }
+  
+  /**
+   * Registers an Overlay object with the level area. Indices 0-2 are used for the primary,
+   * secondary, and tertiary grid overlays, and index 3 is used for the snap points overlay.
+   * @param index the index to place the Overlay at
+   * @param overlay the Overlay object to place at that index
+   */
+  public void setOverlay(int index, Overlay overlay) {
+    overlays[index] = overlay;
+  }
+  
+  // MOUSE EVENTS
+  /*
+  In LevelArea, the mouse interaction is handled at a very low level. A variety of global variables
+  are kept pertaining to the state of mouse operations. The MouseListener and MouseMotionListener
+  interface methods work in tandem, using said variables to keep track of context. Comments are
+  more frequent and explicit in these methods to clarify the various operations.
+  */
+  public void mouseEntered(MouseEvent me) {
+    mouseOn = true;
+    if (grabPoint) {
+      originRow = me.getX();
+      originColumn = me.getY();
+      findLaunchpadReference();
+      grabPoint = false;
+    }
+    repaint();
+  }
+  public void mouseExited(MouseEvent me) {
+    mouseOn = false;
+    if (isTiles) {
+      jned.unHighlight(); // TASK - move to text box
+    }
+    repaint();
+  }
+  public void mouseMoved(MouseEvent me) {
+    if (isTiles) {
+      // Tile mode: previous cell is saved, call to mouseMoveTile finds new cell
+      originRow = mouseRow;
+      originColumn = mouseColumn;
+      mouseMoveTile(me);
+      if(originRow != mouseRow || originColumn != mouseColumn) {
+        copyPasteMenu.setVisible(false);
+      }
+      jned.highlightTile(mouseRow - 1 + 23 * (mouseColumn - 1)); // TASK - move to TextBox
+    } else {
+      if (mode < 0) {
+        if (mode == -1) {
+          // Selection mode: keep track of item under mouse, do highlighting
+          originRow = me.getX();
+          originColumn = me.getY();
+          boolean getnew = false;
+          if (lastItem != null) {
+            if (!lastItem.overlaps(me.getX(), me.getY())) {
+              lastItem.setHighlight(false);
+              lastItem = null;
+              getnew = true;
+              jned.unHighlight(); // TASK - move to TextBox
+            }
+          } else {
+            getnew = true;
+          }
+          if(getnew) {
+            for (int i = items.size()-1; i >= 0; i--) {
+              if (items.get(i).overlaps(me.getX(),me.getY())) {
+                lastItem = items.get(i);
+                lastItem.setHighlight(true);
+                jned.highlightItem(itemIndices[i]); // TASK - move to TextBox
+                break;
+              }
+            }
+          }
+        } else { //Launchpad editing mode
+          double val;
+          switch (mode) {
+            case -2: // Power
+              double theta = -launchPads.get(0).getDirection();
+              val = ((me.getX() - deltaRow) * Math.cos(theta) - (me.getY() - deltaColumn) *
+                  Math.sin(theta)) / 24.0;
+              if (val > 0.000000000000001 || val < -0.000000000000001) {
+                launchPads.get(0).setPower(val);
+                for(int i = 1; i < launchPads.size(); i++) {
+                  launchPads.get(i).setPower(val);
+                }
+              }
+              break;
+            case -3: // Direction
+              val = Math.atan2(me.getY() - deltaColumn, me.getX() - deltaRow);
+              launchPads.get(0).setDirection(val);
+              for(int i = 1; i < launchPads.size(); i++) {
+                launchPads.get(i).setDirection(val);
+              }
+              break;
+            case -4: // Both
+              val = (me.getX() - deltaRow) / 24.0;
+              double val2 = (me.getY() - deltaColumn) / 24.0;
+              launchPads.get(0).setPowerX(val);
+              launchPads.get(0).setPowerY(val2);
+              for(int i = 1; i < launchPads.size(); i++) {
+                launchPads.get(i).setPowerX(val);
+                launchPads.get(i).setPowerY(val2);
+              }
+              break;
+              default:
+          }
+        }
+      } else {
+        // Item adding mode: store the position to add an item in the delta variables
+        deltaRow = me.getX();
+        deltaColumn = me.getY();
+        if (mode >= LevelArea.NDOOR && mode <= LevelArea.TDOOR + 3 && !addingSwitch) {
+          // Door positions are cell coordinates
+          deltaRow /= cellSize;
+          deltaColumn /= cellSize;
+        } else {
+          if (mode >= LevelArea.ZAP && mode <= LevelArea.CHAINGUN + 27) {
+            // Drones should always be snapped to the centers of cells
+            deltaRow = (deltaRow / cellSize) * cellSize + cellSize / 2;
+            deltaColumn = (deltaColumn / cellSize) * cellSize + cellSize / 2;
+          } else {
+            if (snapTo) {
+              deltaRow = snapCoord(deltaRow, true);
+            }
+            if(mode == LevelArea.FLOOR) {
+              // Floorguards should always have the y coordinate snapped to 3/4 past a cell edge
+              deltaColumn = (deltaColumn / cellSize) * cellSize + 3 * cellSize / 4;
+            } else {
+              if(snapTo) {
+                deltaColumn = snapCoord(deltaColumn, false);
+              }
+            }
+          }
+        }
+      }
+    }
+    repaint();
+  }
+  public void mouseDragged(MouseEvent me) {
+    if (buttonDown==1) {
+      if (isTiles) {
+        mouseMoveTile(me);
+        if (mode == -1) {
+          // Selection mode: drag selection box
+          if (originColumn != mouseColumn || originRow != mouseRow) {
+            deltaColumn = originColumn - mouseColumn;
+            deltaRow = originRow - mouseRow;
+            dragged = true;
+          }
+        } else {
+          //Not selection mode: edit all selected tiles
+          edit();
+        }
+      } else {
+        if(mode == -1) {
+          // Item selection mode: drag selection box, or drag selected items
+          deltaRow = me.getX();
+          deltaColumn = me.getY();
+          
+          if (!drawingSelectionBox) {
+            if (snapTo) {
+              lastItem.moveTo(snapCoord(deltaRow, true), snapCoord(deltaColumn, false));
+              for (Item it : selection) {
+                it.moveRelative(lastItem.getX(), lastItem.getY());
+              }
+            } else {
+              for (Item it : selection) {
+                it.moveRelative(deltaRow, deltaColumn);
+              }
+            }
+          }
+        }
+      }
+    }
+    repaint();
+  }
+  public void mousePressed(MouseEvent me) {
+    if (me.getButton() == MouseEvent.BUTTON1) {
+      buttonDown = 1;
+      if (isTiles) {
+        // Tile mode: save the click point in preparation for a drag
+        originRow = mouseRow;
+        originColumn = mouseColumn;
+        dragged = false;
+      } else {
+        if (mode < 0) {
+          if (mode == -1) { //Selection mode
+            // Item selection mode: save click point in preparation for a drag
+            originRow = me.getX();
+            originColumn = me.getY();
+            if(lastItem == null || keys.isShiftPushed()) {
+              // Clicking on nothing or shift-clicking initiates a drag
+              if (!keys.isCtrlPushed()) {
+                clearSelection();
+              }
+              drawingSelectionBox = true;
+              // ! - These must be set now to prevent a drag box being drawn from this point to
+              // their previous values in the first frame 
+              deltaRow = me.getX();
+              deltaColumn = me.getY();
+            } else {
+              if (lastItem.isSelected() && keys.isCtrlPushed()) {
+                // Ctrl-clicking on a selected item de-selects it
+                selection.remove(lastItem);
+                lastItem.setSelect(false);
+                // ...and initiates a drag, just like clicking on nothing
+                drawingSelectionBox = true;
+                deltaRow = me.getX();
+                deltaColumn = me.getY();
+              } else {
+                if (!lastItem.isSelected() && !keys.isCtrlPushed()) {
+                  // Normal-clicking a non-selected item clears the selection
+                  clearSelection();
+                }
+                selection.remove(lastItem);
+                selection.add(lastItem);
+                lastItem.setSelect(true);
+                
+                // All selected items are given reference coordinates in preparation for a drag
+                if(snapTo) {
+                  for (Item item : selection) {
+                      item.setDelta(lastItem.getX(), lastItem.getY());
+                  }
+                } else {
+                  for (Item item : selection) {
+                    item.setDelta(originRow, originColumn);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    if(me.getButton() == MouseEvent.BUTTON3) {
+      buttonDown = 2;
+    }
+    repaint();
+  }
+  public void mouseReleased(MouseEvent me) {
+    buttonDown = 0;
+    if (me.getButton() == MouseEvent.BUTTON1) {
+      if (isTiles) {
+        if (mode == -1) {
+          // Tile selection mode: clicking without dragging reduces selection box back to 1 cell
+          if (!dragged) {
+            deltaRow = 0;
+            deltaColumn = 0;
+          }
+        } else {
+          edit();
+        }
+      } else {
+        if (mode < 0) {
+          if (mode == -1) {
+            // Item selection mode: selects all items in dragged selection box
+            if (drawingSelectionBox) {
+              Rectangle selectionRectangle = new Rectangle(Math.min(originRow, deltaRow),
+                  Math.min(originColumn, deltaColumn), Math.abs(deltaRow - originRow),
+                  Math.abs(deltaColumn - originColumn));
+              for (Item item : items) {
+                if (item.overlaps(selectionRectangle)) {
+                  selection.remove(item);
+                  selection.add(item);
+                  item.setSelect(true);
+                }
+              }
+              drawingSelectionBox = false;
+            }
+          } else {
+            // Launchpad modes: mouse release exits mode
+            mode = -1;
+          }
+        } else {
+          // Item adding modes: adds item
+          int type = getType(mode);
+          Item anItem = null;
+          switch(type) {
+            case 0:
+              anItem = new Gaussturret(jned, deltaRow, deltaColumn);
+              break;
+            case 1:
+              anItem = new Hominglauncher(jned, deltaRow, deltaColumn);
+              break;
+            case 2:
+              anItem = new Mine(jned, deltaRow, deltaColumn);
+              break;
+            case 3:
+              anItem = new Floorguard(jned, deltaRow, deltaColumn);
+              break;
+            case 4:
+              anItem = new Thwump(jned, deltaRow, deltaColumn, mode - LevelArea.THWUMP);
+              break;
+            case 5:
+              anItem = new Zapdrone(jned, deltaRow, deltaColumn, (mode - LevelArea.ZAP) / 7, (mode
+                  - LevelArea.ZAP) % 7);
+              drones.add((Drone) anItem);
+              break;
+            case 6:
+              anItem = new Seekerdrone(jned, deltaRow, deltaColumn, (mode - LevelArea.SEEKER) / 7,
+                  (mode - LevelArea.SEEKER) % 7);
+              drones.add((Drone) anItem);
+              break;
+            case 7:
+              anItem = new Laserdrone(jned, deltaRow, deltaColumn, (mode - LevelArea.LASER) / 7,
+                  (mode - LevelArea.LASER) % 7);
+              drones.add((Drone) anItem);
+              break;
+            case 8:
+              anItem = new Chaingundrone(jned, deltaRow, deltaColumn, (mode - LevelArea.CHAINGUN)
+              / 7, (mode - LevelArea.CHAINGUN) % 7);
+              drones.add((Drone) anItem);
+              break;
+            case 9:
+              anItem = new Player(jned, deltaRow, deltaColumn);
+              thePlayer = items.size();
+              break;
+            case 10:
+              anItem = new Gold(jned, deltaRow, deltaColumn);
+              break;
+            case 11:
+              anItem = new Bounceblock(jned, deltaRow, deltaColumn);
+              break;
+            case 12:
+              if (addingSwitch) {
+                // Exit adding completed
+                anItem = new Exit(jned, originRow, originColumn, deltaRow, deltaColumn);
+                addingSwitch = false;
+              } else {
+                // Door added, change to switch adding mode
+                originRow = deltaRow;
+                originColumn = deltaColumn;
+                deltaRow = me.getX();
+                deltaColumn = me.getY();
+                addingSwitch = true;
+              }
+              break;
+            case 13:
+              anItem = new Oneway(jned, deltaRow, deltaColumn, mode - LevelArea.ONEWAY);
+              break;
+            case 14:
+              anItem = new Normaldoor(jned, mode-LevelArea.NDOOR,deltaRow,deltaColumn);
+              doors.add((Door) anItem);
+              break;
+            case 15:
+              // fall through
+            case 16:
+              if(addingSwitch) {
+                // Switchdoor adding completed
+                if (type == 15) {
+                  anItem = new Lockeddoor(jned, deltaRow, deltaColumn, mode - LevelArea.LDOOR,
+                      originRow, originColumn);
+                } else {
+                  anItem = new Trapdoor(jned, deltaRow, deltaColumn, (mode - LevelArea.NDOOR) % 4,
+                      originRow, originColumn);
+                }
+                addingSwitch = false;
+                doors.add((Door) anItem);
+              } else {
+                // Door added, change to switch adding mode
+                originRow = deltaRow;
+                originColumn = deltaColumn;
+                deltaRow = me.getX();
+                deltaColumn = me.getY();
+                addingSwitch = true;
+              }
+              break;
+            case 17:
+              anItem = new Launchpad(jned, deltaRow, deltaColumn, mode - LevelArea.LAUNCH);
+              break;
+            case -1:
+              // fall through
+            default:
+          }
+          if (anItem != null) {
+            items.add(anItem);
+          }
+        }
+      }
+      jned.updateText(outputLevel());
+      calculateDronePaths(); // TASK - test adding a door in a drone path
+    }
+    if (me.getButton() == MouseEvent.BUTTON3) {
+      if (isTiles) {
+        if( mode == -1) {
+          copyPasteMenu.show(this, me.getX(), me.getY());
+        }
+      } else {
+        if (mode == -1) {
+          // Item selection mode right-click: saves mouse point, shows drop-down menu
+          originRow = me.getX();
+          originColumn = me.getY();
+          if (drawingSelectionBox) {
+            drawingSelectionBox = false;
+          } else {
+            // Right-click menu is compiled with appropriate actions per item using items' flags
+            if (selection.size() > 0) {
+              int flags = 0;
+              for (Item item : selection) {
+                flags = flags | item.getFlags();
+              }
+              compileMenu(flags);
+              itemMenu.show(this, me.getX(), me.getY());
+            } else {
+              if (lastItem != null) {
+                rightClickedItem = lastItem;
+                compileMenu(rightClickedItem.getFlags());
+                itemMenu.show(this, me.getX(), me.getY());
+              } else {
+                rightClickedItem = null;
+                compileMenu(0);
+                itemMenu.show(this, me.getX(), me.getY());
+              }
+            }
+          }
+        } else {
+          if(mode < -1) {
+            mode = -1;
+            jned.updateText(outputLevel());
+          }
+        }
+      }
+    }
+    repaint();
+  }
+  // Returns the nearest snap point to a given coordinate
+  protected int snapCoord(int coordinate, boolean isX) {
+    scratch1 = overlays[3].getPoints(isX);
+    int ind = Collections.binarySearch(scratch1, coordinate);
+    if (ind < 0) {
+      ind = -ind - 1;
+    }
+    try {
+      if(coordinate - scratch1.get(ind - 1) < scratch1.get(ind) - coordinate) {
+        return scratch1.get(ind - 1);
+      } else {
+        return scratch1.get(ind);
+      }
+    } catch (IndexOutOfBoundsException ioobe) {
+      // Coordinates outside the level area are not snapped
+      return coordinate;
+    }
+  }
+  // Updates mouse row and column
+  private void mouseMoveTile (MouseEvent me) {
+    mouseColumn = (me.getX()) / cellSize;
+    mouseRow = (me.getY()) / cellSize;
+    borderCheck();
+  }
+  // Keeps the position of the tile selection box inside the level bounds
+  private void borderCheck() {
+    mouseColumn -= Math.min(Math.min(0, deltaColumn) + mouseColumn - 1, 0) + Math.max(Math.max(0,
+        deltaColumn) + mouseColumn - 31, 0);
+    mouseRow -= Math.min(Math.min(0, deltaRow) + mouseRow - 1, 0) + Math.max(Math.max(0, deltaRow)
+        + mouseRow - 23, 0);
+  }  
+  
+  /**
+   * Returns the item type number for a given mode. Type numbers range from 0 to 17, corresponding
+   * to standard index order used throughout Jned.
+   * @param code item mode, corresponding to the item editing mode numbers of LevelArea
+   * @return item type, or -1 for an invalid mode
+   */
+  public int getType(int code) {
+    if (code == LevelArea.GAUSS) return 0;
+    if (code == LevelArea.HOMING) return 1;
+    if (code == LevelArea.MINE) return 2;
+    if (code == LevelArea.FLOOR) return 3;
+    if (code >= LevelArea.THWUMP && code <= LevelArea.THWUMP + 3) return 4;
+    if (code >= LevelArea.ZAP && code <= LevelArea.ZAP + 27) return 5;
+    if (code >= LevelArea.SEEKER && code <= LevelArea.SEEKER + 27) return 6;
+    if (code >= LevelArea.LASER && code <= LevelArea.LASER + 27) return 7;
+    if (code >= LevelArea.CHAINGUN && code <= LevelArea.CHAINGUN + 27) return 8;
+    if (code == LevelArea.PLAYER) return 9;
+    if (code == LevelArea.GOLD) return 10;
+    if (code == LevelArea.BOUNCE) return 11;
+    if (code == LevelArea.EXIT) return 12;
+    if (code >= LevelArea.ONEWAY && code <= LevelArea.ONEWAY + 3) return 13;
+    if (code >= LevelArea.NDOOR && code <= LevelArea.NDOOR + 3) return 14;
+    if (code >= LevelArea.LDOOR && code <= LevelArea.LDOOR + 3) return 15;
+    if (code >= LevelArea.TDOOR && code <= LevelArea.TDOOR + 3) return 16;
+    if (code >= LevelArea.LAUNCH && code <= LevelArea.LAUNCH + 7) return 17;
+    return -1;
+  }
+  
+  private void clearSelection() {
+    for (Item item: selection) {
+      item.setSelect(false);
+    }
+    selection.clear();
+  }
+  
+  public void pushDelete() {
+    if (selection.size() > 0 ) {
+      for (Item item: selection) {
+        removeItem(item);
+      }
+      selection.clear();
+    } else {
+      if (rightClickedItem != null) {
+        removeItem(rightClickedItem);
+      }
+    }
+    jned.updateText(outputLevel());
+  }
+  
+  private void removeItem(Item item) {
+    int ind = items.indexOf(item);
+    if (ind == thePlayer) {
+      // When active player is deleted, a new active player is selected
+      boolean notfound = true;
+      for (int i = items.size() - 1; i >= 0; i--) {
+        if (items.get(i).getType() == 9 && thePlayer != i) {
+          thePlayer = i;
+          notfound = false;
+          break;
+        }
+      }
+      if (notfound) {
+        thePlayer = -1;
+      }
+    }
+    if (thePlayer > ind) {
+      thePlayer--;
+    }
+    items.remove(item);
+    
+    drones.remove(item);
+    if (doors.remove(item)) {
+      recalculateDronePaths();
+      calculateDronePaths();
+    }
+  }
+  
+  public void paintComponent(Graphics g) {
+    super.paintComponent(g);
+    
+    // Border
+    g.setColor(Colors.TILE_FILL);
+    g.fillRect(0, 0, getWidth(), cellSize);
+    g.fillRect(0, getHeight() - cellSize, getWidth(), cellSize);
+    g.fillRect(0, cellSize, cellSize, getHeight() - 2 * cellSize);
+    g.fillRect(getWidth() - cellSize, cellSize, cellSize, getHeight() - 2 * cellSize);
+    
+    // Tiles
+    //g.setColor(Colors.TILE_FILL); // TASK - remove after testing this
+    int tx;
+    int ty;
+    for (int i = 0; i < 31; i++) {
+      for (int j = 0; j < 23; j++) {
+        if (tiles[i][j] != 0) {
+          tx = (i + 1) * cellSize;
+          ty = (j + 1) * cellSize;
+          switch (tiles[i][j]) {
+            case 1:
+              g.fillRect(tx, ty, cellSize, cellSize);
+              break;
+            
+            // 45 degree
+            case 2: // Q
+              {int[] xs = {tx + cellSize, tx, tx + cellSize};
+              int[] ys = {ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 3: // W
+              {int[] xs = {tx, tx, tx + cellSize};
+              int[] ys = {ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 4: // S
+              {int[] xs = {tx, tx + cellSize, tx};
+              int[] ys = {ty, ty, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 5: // A
+              {int[] xs = {tx, tx + cellSize, tx + cellSize};
+              int[] ys = {ty, ty, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            // 63 degree thin
+            case 6: // Q
+              {int[] xs = {tx + cellSize, tx + cellSize / 2, tx + cellSize};
+              int[] ys = {ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 7: // W
+              {int[] xs = {tx, tx, tx + cellSize / 2};
+              int[] ys = {ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 8: // S
+              {int[] xs = {tx, tx + cellSize / 2, tx};
+              int[] ys = {ty, ty, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 9: // A
+              {int[] xs = {tx + cellSize / 2, tx + cellSize, tx + cellSize};
+              int[] ys = {ty, ty, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            
+            // 27 degree thin
+            case 10: // Q
+              {int[] xs = {tx + cellSize, tx, tx + cellSize};
+              int[] ys = {ty + cellSize / 2, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 11: // W
+              {int[] xs = {tx, tx, tx + cellSize};
+              int[] ys = {ty + cellSize / 2, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 12: // S
+              {int[] xs = {tx, tx + cellSize, tx};
+              int[] ys = {ty, ty, ty + cellSize / 2};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            case 13: // A
+              {int[] xs = {tx, tx + cellSize, tx + cellSize};
+              int[] ys = {ty, ty, ty + cellSize / 2};
+              g.fillPolygon(xs, ys, 3);}
+              break;
+            
+            // Concave curve
+            case 14: // Q
+              g.fillRect(tx, ty, cellSize, cellSize);
+              g.setColor(Colors.TILE_SPACE);
+              g.fillArc(tx - cellSize, ty - cellSize, cellSize * 2 - 1, cellSize * 2 - 1, 270, 90);
+              g.setColor(Colors.TILE_FILL);
+              break;
+            case 15: // W
+              g.fillRect(tx, ty, cellSize, cellSize);
+              g.setColor(Colors.TILE_SPACE);
+              g.fillArc(tx, ty - cellSize, cellSize * 2 - 1, cellSize * 2 - 1, 180, 90);
+              g.setColor(Colors.TILE_FILL);
+              break;
+            case 16: // S
+              g.fillRect(tx, ty, cellSize, cellSize);
+              g.setColor(Colors.TILE_SPACE);
+              g.fillArc(tx, ty, cellSize * 2 - 1, cellSize * 2 - 1, 90, 90);
+              g.setColor(Colors.TILE_FILL);
+              break;
+            case 17: // A
+              g.fillRect(tx, ty, cellSize, cellSize);
+              g.setColor(Colors.TILE_SPACE);
+              g.fillArc(tx - cellSize, ty, cellSize * 2 - 1, cellSize * 2 - 1, 0, 90);
+              g.setColor(Colors.TILE_FILL);
+              break;
+            
+            // Half tile
+            case 18: // Q
+              g.fillRect(tx, ty, cellSize / 2, cellSize);
+              break;
+            case 19: // W
+              g.fillRect(tx, ty, cellSize, cellSize / 2);
+              break;
+            case 20: // S
+              g.fillRect(tx + cellSize / 2, ty, cellSize / 2, cellSize);
+              break;
+            case 21: // A
+              g.fillRect(tx, ty + cellSize / 2, cellSize, cellSize / 2);
+              break;
+            
+            // 63 degree thick
+            case 22: // Q
+              {int[] xs = {tx + cellSize / 2, tx + cellSize, tx + cellSize, tx};
+              int[] ys = {ty, ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            case 23: // W
+              {int[] xs = {tx, tx + cellSize / 2, tx + cellSize, tx};
+              int[] ys = {ty, ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            case 24: // S
+              {int[] xs = {tx, tx + cellSize, tx + cellSize / 2, tx};
+              int[] ys = {ty, ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            case 25: // A
+              {int[] xs = {tx, tx + cellSize, tx + cellSize, tx + cellSize / 2};
+              int[] ys = {ty, ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            
+            // 27 degree thick
+            case 26: // Q
+              {int[] xs = {tx, tx + cellSize, tx + cellSize, tx};
+              int[] ys = {ty + cellSize / 2, ty, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            case 27: // W
+              {int[] xs = {tx, tx + cellSize, tx + cellSize, tx};
+              int[] ys = {ty, ty + cellSize / 2, ty + cellSize, ty + cellSize};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            case 28: // S
+              {int[] xs = {tx, tx + cellSize, tx + cellSize, tx};
+              int[] ys = {ty, ty, ty + cellSize / 2, ty + cellSize};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            case 29: // A
+              {int[] xs = {tx, tx + cellSize, tx + cellSize, tx};
+              int[] ys = {ty, ty, ty + cellSize, ty + cellSize / 2};
+              g.fillPolygon(xs, ys, 4);}
+              break;
+            
+            // Convex curve
+            case 30: // Q
+              g.fillArc(tx, ty, cellSize * 2, cellSize * 2, 90, 90);
+              break;
+            case 31: // W
+              g.fillArc(tx - cellSize, ty, cellSize * 2, cellSize * 2, 0, 90);
+              break;
+            case 32: // S
+              g.fillArc(tx - cellSize, ty - cellSize, cellSize * 2, cellSize * 2, 270, 90);
+              break;
+            case 33: // A
+              g.fillArc(tx, ty - cellSize, cellSize * 2, cellSize * 2, 180, 90);
+              break;
+              
+            default:
+          }
+        }
+      }
+    }
+    
+    // Gridlines
+    if (drawingGrid) {
+      for (int i = 2; i >= 0; i--) {
+        if (overlays[i] != null) {
+          if (overlays[i].isOn()) {
+            switch (i) {
+              case 0:
+                g.setColor(Colors.PRIMARY_GRID);
+                break;
+              case 1:
+                g.setColor(Colors.SECONDARY_GRID);
+                break;
+              case 2:
+                g.setColor(Colors.TERTIARY_GRID);
+                break;
+              default:
+            }
+            scratch1 = overlays[i].getPoints(true);
+            for (Integer coordinate : scratch1) {
+              if (coordinate > 0 && coordinate < getWidth() - 2 * cellSize - 1) {
+                g.drawLine(coordinate + cellSize, cellSize, coordinate + cellSize, getHeight() -
+                    cellSize - 1);
+              }
+            }
+            scratch1 = overlays[i].getPoints(false);
+            for (Integer coordinate : scratch1) {
+              if (coordinate > 0 && coordinate < getHeight() - 2 * cellSize - 1) {
+                g.drawLine(cellSize, coordinate + cellSize, getWidth() - cellSize - 1, coordinate
+                    + cellSize);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Snap points
+    if (drawingSnapPoints) {
+      if( overlays[3] != null) {
+        g.setColor(Colors.SNAP_POINTS);
+        scratch1 = overlays[3].getPoints(true);
+        scratch2 = overlays[3].getPoints(false);
+        for (Integer xCoordinate : scratch1) {
+          if (xCoordinate > 0 && xCoordinate < getWidth() - 1) {
+            for (Integer yCoordinate : scratch2) {
+              if (yCoordinate > 0 && yCoordinate < getHeight() - 1) {
+                g.drawLine(xCoordinate, yCoordinate, xCoordinate, yCoordinate);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Tile selection box
+    if (mouseOn || copyPasteMenu.isVisible()) {
+      if (isTiles) {
+        g.setColor(Colors.TILE_SELECT);
+        g.drawRect((Math.min(0, deltaColumn) + mouseColumn) * cellSize, (Math.min(0, deltaRow)
+            + mouseRow) * cellSize, (Math.abs(deltaColumn) + 1) * cellSize - 1, (Math.abs(deltaRow)
+            + 1) * cellSize - 1);
+      }
+    }
+    
+    // Items
+    for (Item item : items) {
+      item.paint(g);
+      if (drawingTriggers) {
+        item.paintTrigger(g);
+      }
+      if (mode < -1) {
+        for (Launchpad lp : launchPads) {
+          lp.paintLine(g);
+        }
+      }
+    }
+    if (drawingDronePaths) {
+      for (Drone drone : drones) {
+        drone.paintPath(g);
+      }
+    }
+    
+    if (mouseOn) {
+      if (!isTiles) {
+        if (mode == -1) {
+          // Item selection box
+          if (drawingSelectionBox) {
+            g.setColor(Colors.SELECTION_BOX);
+            g.drawRect(Math.min(originRow, deltaRow), Math.min(originColumn, deltaColumn),
+                Math.abs(deltaRow - originRow), Math.abs(deltaColumn - originColumn));
+          }
+        } else {
+          // Ghosts
+          int type = getType(mode);
+          switch (type){
+            case 0:
+              Gaussturret.paintGhost(deltaRow, deltaColumn, g);
+              break;
+            case 1:
+              Hominglauncher.paintGhost(deltaRow, deltaColumn, g);
+              break;
+            case 2:
+              Mine.paintGhost(deltaRow, deltaColumn, g);
+              break;
+            case 3:
+              Floorguard.paintGhost(deltaRow, deltaColumn, g);
+              break;
+            case 4:
+              Thwump.paintGhost(deltaRow,deltaColumn,g);
+              break;
+            case 5:
+              Zapdrone.paintGhost(type, deltaRow, deltaColumn, (mode - LevelArea.ZAP) / 4, g);
+              break;
+            case 6:
+              Seekerdrone.paintGhost(type, deltaRow, deltaColumn, (mode - LevelArea.SEEKER) / 4, g);
+              break;
+            case 7:
+              Laserdrone.paintGhost(type, deltaRow, deltaColumn, (mode - LevelArea.LASER) / 4, g);
+              break;
+            case 8:
+              Chaingundrone.paintGhost(type, deltaRow, deltaColumn, (mode - LevelArea.CHAINGUN) /
+                  4, g);
+              break;
+            case 9:
+              Player.paintGhost(deltaRow, deltaColumn, g);
+              break;
+            case 10:
+              Gold.paintGhost(deltaRow, deltaColumn, g);
+              break;
+            case 11:
+              Bounceblock.paintGhost(deltaRow, deltaColumn, g);
+              break;
+            case 12:
+              if (addingSwitch) {
+                Exit.paintSwitchGhost(originRow, originColumn, deltaRow, deltaColumn, g);
+              } else {
+                Exit.paintDoorGhost(deltaRow, deltaColumn, g);
+              }
+              break;
+            case 13:
+              Oneway.paintGhost(deltaRow, deltaColumn, mode - LevelArea.ONEWAY, g);
+              break;
+            case 14:
+              Normaldoor.paintGhost(mode - LevelArea.NDOOR, deltaRow, deltaColumn, g);
+              break;
+            case 15:
+              if (addingSwitch) {
+                Lockeddoor.paintSwitchGhost(deltaRow, deltaColumn, mode - LevelArea.LDOOR,
+                    originRow, originColumn, g);
+              } else {
+                Lockeddoor.paintDoorGhost(mode - LevelArea.LDOOR, deltaRow, deltaColumn, g);
+              }
+              break;
+            case 16:
+              if (addingSwitch) {
+                Trapdoor.paintSwitchGhost(deltaRow, deltaColumn, (mode - LevelArea.NDOOR) % 4,
+                    originRow, originColumn, g);
+              } else {
+                Trapdoor.paintDoorGhost(mode - LevelArea.TDOOR, deltaRow, deltaColumn, g);
+              }
+              break;
+            case 17:
+              Launchpad.paintGhost(deltaRow, deltaColumn, mode - LevelArea.LAUNCH, g);
+              break;
+            default:
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * Nudges positions of all selected items, or the item under the mouse if none are selected.
+   * @param xAmount pixels to move horizontally. Negative for left, positive for right. 
+   * @param yAmount pixels to move vertically. Negative for up, positive for down.
+   */
+  public void nudge(int xAmount, int yAmount) {
+    if (selection.size() > 0) {
+      for (Item item : selection) {
+        item.setDelta(originRow, originColumn);
+        item.moveRelative(originRow + xAmount, originColumn + yAmount);
+      }
+    } else {
+      if (rightClickedItem != null) {
+        if (rightClickedItem.getType() == 15 || rightClickedItem.getType() == 16) {
+          if (!((SwitchDoor) rightClickedItem).overlapsDoor(originRow, originColumn)) {
+            rightClickedItem.moveTo(rightClickedItem.getX() + xAmount, rightClickedItem.getY() +
+              yAmount);
+          }
+        } else {
+          rightClickedItem.moveTo(rightClickedItem.getX() + xAmount, rightClickedItem.getY() +
+            yAmount); // TASK - remember why this can't be done with setDelta/moveRelative
+        }
+      }
+    }
+    jned.updateText(outputLevel());
+  }
+  
+  /**
+   * Changes the direction of all selected items, or the item under the mouse if none are selected.
+   * @param newDirection direction to change to
+   */
+  public void changeDirection(int newDirection) {
+    if (selection.size() > 0) {
+      for (Item item : selection) {
+        if ((item.getType() >= 4 && item.getType() <= 8) || (item.getType() >= 13 &&
+            item.getType() <= 16)) {
+          ((DirectionalItem) item).setDirection(newDirection / 2);
+        }
+        if (item.getType() == 17) {
+          ((Launchpad) item).setDirection(newDirection * Math.PI / 4.0);
+        }
+      }
+    } else {
+      if (rightClickedItem != null) {
+        if ((rightClickedItem.getType() >= 4 && rightClickedItem.getType() <= 8) ||
+          (rightClickedItem.getType() >= 13 && rightClickedItem.getType() <= 16)) {
+          ((DirectionalItem) rightClickedItem).setDirection(newDirection / 2);
+        }
+        if (rightClickedItem.getType() == 17) {
+          ((Launchpad) rightClickedItem).setDirection(newDirection * Math.PI / 4.0);
+        }
+      }
+    }
+    jned.updateText(outputLevel());
+    recalculateDronePaths();
+    calculateDronePaths();
+  }
+  
+  /**
+   * Changes the behavior of all selected drones, or the item under the mouse if none are selected.
+   * @param newBehavior behavior to change to
+   */
+  public void changeBehavior(int newBehavior) {
+    if (selection.size() > 0) {
+      for (Item item : selection) {
+        if (item.getType() >= 5 && item.getType() <= 8) {
+          ((Drone) item).setBehavior(newBehavior);
+        }
+      }
+    } else {
+      if (rightClickedItem != null) {
+        if (rightClickedItem.getType() >= 5 && rightClickedItem.getType() <= 8) {
+          ((Drone) rightClickedItem).setBehavior(newBehavior);
+        }
+      }
+    }
+    jned.updateText(outputLevel());
+    recalculateDronePaths();
+    calculateDronePaths();
+  }
+  
+  /**
+   * Changes the active player to one selected Player, or the Player under the mouse if none are
+   * selected.
+   */
+  public void setActivePlayer() {
+    if (selection.size() > 0) {
+      for (Item item : selection) {
+        if (item.getType() == 9) {
+          thePlayer = items.indexOf(item);
+        }
+      }
+    } else {
+      if (rightClickedItem != null) {
+        if (rightClickedItem.getType() == 9) {
+          thePlayer = items.indexOf(rightClickedItem);
+        }
+      }
+    }
+    jned.updateText(outputLevel());
+  }
+  
+  // TASK - CHANGE ALL LAUNCHPAD EDITING OPERATIONS
+  // Finds all selected launchpads or launchpad undermouse and places in launchPads array
+  private void findLaunchpads() {
+    launchPads.clear();
+    if (selection.size() > 0) {
+      for (Item item : selection) {
+        if (item.getType() == 17) {
+          launchPads.add((Launchpad) item);
+        }
+      }
+    } else {
+      if (rightClickedItem != null) {
+        if (rightClickedItem.getType() == 17) {
+          launchPads.add((Launchpad) rightClickedItem);
+        }
+      }
+    }
+    // To get around the problem of grabbing the mouse position while mouse events are being
+    // absorbed by a pop-up menu, this boolean value is set. The mouseEnterred() event will read it
+    // and immediately record the mouse position. Used for launchpad editing.
+    grabPoint = true;
+  }
+  // Called after the mouseEnterred() event. Sets reference point for mouse-following launchpad
+  // editing operations. Point is set to position of imaginary launchpad object with the mouse
+  // point at the peak of its power/direction line.
+  private void findLaunchpadReference() {
+    deltaRow = originRow - (int)(launchPads.get(0).getPowerX() * 24); 
+    deltaColumn = originColumn - (int)(launchPads.get(0).getPowerY() * 24);
+  }
+  
+  public void mouseClicked(MouseEvent me) {}
 }

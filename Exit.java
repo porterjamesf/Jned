@@ -1,232 +1,381 @@
-/*
-Exit.java
-James Porter
+import java.awt.Graphics;
+import java.awt.Rectangle;
 
-A subclass of Item for the exit door and switch.
-*/
-
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.*;
-import javax.imageio.ImageIO;
-
+/**
+ * An Exit Door item in Jned.
+ * @author James Porter
+ */
 public class Exit extends Item {
-	private int	xsw,	//Coordinates of the door switch
-				ysw,
-				deltaxsw,
-				deltaysw;
-	private Rectangle	door,	//Rectangle representing door
-						swtch;	//Rectangel representing switch
-	private boolean	overswitch,		//True when the overlap method is true for the swtch rectangle
-					overdoor,		//True when the overlap method is true for the door rectangle
-					switchselected,	//True when the switch is selected; the selected variable inherited from Item is for the door only.
-					switchhighlighted;	//True when the switch is highlighted; the highlighted variable inherited from Item is for the door only.
-					
-	//Constructor
-	public Exit (Jned mind, int xpos, int ypos, int switchx, int switchy) {
-		super(mind, 12,xpos,ypos);
-		xsw = switchx;
-		ysw = switchy;
-		deltaxsw = deltaysw = 0;
-		overswitch = overdoor = switchselected = switchhighlighted = false;
-		
-		calcRect(true);
-		calcRect(false);
-		
-		setImage(ImageBank.EXIT);
-	}
-	
-	public Exit duplicate() {
-		return new Exit(mind, getX(), getY(), xsw, ysw);
-	}
-	
-	//Calculates the rectangles
-	private void calcRect(boolean isDoor) {
-		if(isDoor) {
-			door = new Rectangle(super.getX()-13,super.getY()-12,26,24);
-		} else {
-			swtch = new Rectangle(xsw-6,ysw-4,13,7);
-		}
-	}
-	
-	//Overrides getZ in Item: returns whether the switch's position is overlapped
-	public int getX() {
-		if(overswitch) {
-			return xsw;
-		}
-		return super.getX();
-	}
-	public int getY() {
-		if(overswitch) {
-			return ysw;
-		}
-		return super.getY();
-	}
-	public int getSuperX() {
-		return super.getX();
-	}
-	public int getSuperY() {
-		return super.getY();
-	}
-	
-	//Accessors/mutators for switch position
-	public int getSwitchX() {
-		return xsw;
-	}
-	public int getSwitchY() {
-		return ysw;
-	}
-	
-	//Overrides Item.setDelta: takes into account delta of switch vs. door
-	public void setDelta(int xpos, int ypos) {
-		super.setDelta(xpos,ypos);
-		deltaxsw = xpos-xsw;
-		deltaysw = ypos-ysw;
-	}
-	//Overrides Item.moveTo: takes into account movement of switch vs. door
-	public void moveTo(int xpos, int ypos) {
-		if(overswitch) {
-			xsw = xpos;
-			ysw = ypos;
-			calcRect(false);
-		} else {
-			super.moveTo(xpos,ypos);
-			calcRect(true);
-		}
-	}
-	//Overrides Item.moveRelative: takes into account movement of switch vs. door, using the appropriate set of delta values
-	// Normally will only move parts that are selected (for drag operations). Alternately, you can use the force parameter to 
-	// make sure both parts move whether or not they are selected (used for pasting).
-	public void moveRelative(int xpos, int ypos) {
-		moveRelative(xpos, ypos, false);
-	}
-	public void moveRelative(int xpos, int ypos, boolean force) {
-		if(force || super.isSelected()) {
-			super.moveRelative(xpos,ypos);
-			calcRect(true);
-		}
-		if(force || switchselected) {
-			xsw = xpos - deltaxsw;
-			ysw = ypos - deltaysw;
-			calcRect(false);
-		}
-	}
-	
-	//Returns the n code for this object
-	public String toString() {
-		return super.toString() + "," + xsw + "," + ysw;
-	}
-	
-	//Checks to see if a given coordinate overlaps this item
-	public boolean overlaps(int xpos, int ypos) {
-		if(swtch.contains(xpos,ypos)) {
-			overswitch = true;
-		} else {
-			overswitch = false;
-		}
-		if(door.contains(xpos,ypos)) {
-			overdoor = true;
-		} else {
-			overdoor = false;
-		}
-		return overswitch || overdoor;
-	}
-	//Checks to see if a given rectangle overlaps this item
-	public boolean overlaps(Rectangle rect) {
-		if(door.intersects(rect)) {
-			overdoor = true;
-		} else {
-			overdoor = false;
-		}
-		if(swtch.intersects(rect)) {
-			overswitch = true;
-		} else {
-			overswitch = false;
-		}
-		return overswitch || overdoor;
-	}
-	
-	//Overrides Item.setSelect: takes into account selection of switch vs. door
-	public void setSelect(boolean select, boolean force) {
-		if(select == false) {
-			super.setSelect(false);
-			switchselected = false;
-		} else {
-			if(overswitch || force) switchselected = true;
-			if(overdoor || force) super.setSelect(true);
-		}
-	}
-	public void setSelect(boolean select) {
-		setSelect(select, false);
-	}
-	//Overrides Item.isSelected: only returns true if the overlapped components are selected
-	//  Used by the LevelArea method that checks to see if the item being clicked on is part of the selection or not (mousePressed)
-	public boolean isSelected() {
-		if(overswitch) {
-			return switchselected;
-		}
-		return super.isSelected();
-	}
-	//Overrides Item.setHighlight: takes into account highlighting of switch vs. door
-	public void setHighlight(boolean highlight) {
-		if(highlight == false) {
-			super.setHighlight(false);
-			switchhighlighted = false;
-		} else {
-			if(overswitch) switchhighlighted = true;
-			if(overdoor) super.setHighlight(true);
-		}
-	}
-	
-	//Paint methods
-	public void paint(Graphics g) {
-		//Door
-		boolean[] layer = {true,isHighlighted(),super.isSelected()};
-		for(int i = 0; i < 3; i++) {
-			if(i==0) {
-				if(mind.drawImage(getImage(), super.getX(), super.getY(), g)) {
-					layer[0] = false;
-				} else {
-					g.setColor(Jned.ITEM);
-				}
-			}
-			if(i==1)g.setColor(Jned.ITEM_HL_A);
-			if(i==2)g.setColor(Jned.ITEM_SELECT_A);
-			if(layer[i]) g.fillRect(door.x,door.y,door.width,door.height);
-		}
-		//Switch
-		layer[0] = true;
-		layer[1] = switchhighlighted;
-		layer[2] = switchselected;
-		for(int i = 0; i < 3; i++) {
-			if(i==0) {
-				if(mind.drawImage(getImage()+1, xsw, ysw, g)) {
-					layer[0] = false;
-				} else {
-					g.setColor(Jned.ITEM);
-				}
-			}
-			if(i==1)g.setColor(Jned.ITEM_HL_A);
-			if(i==2)g.setColor(Jned.ITEM_SELECT_A);
-			if(layer[i]) g.fillRect(swtch.x,swtch.y,swtch.width,swtch.height);
-		}
-	}
-	public void paintTrigger(Graphics g) {
-		g.setColor(Jned.DOOR_TRIGGER);
-		g.drawLine(super.getX(),super.getY(),xsw,ysw);
-	}
-	public static void paintSwitchGhost(int xpos, int ypos, int switchx, int switchy, Graphics g) {
-		//Door
-		Exit.paintDoorGhost(xpos,ypos,g);
-		//Switch
-		g.setColor(Jned.ITEM_GHOST);
-		g.fillRect(switchx-6,switchy-4,13,7);
-		//Trigger line
-		g.setColor(Jned.DOOR_TRIGGER);
-		g.drawLine(xpos,ypos,switchx,switchy);
-	}
-	public static void paintDoorGhost(int xpos, int ypos, Graphics g) {
-		g.setColor(Jned.ITEM_GHOST);
-		g.fillRect(xpos-13,ypos-12,26,24);
-	}
+  private int switchX;
+  private int switchY;
+  private int deltaSwitchX;
+  private int deltaSwitchY;
+  
+  private Rectangle doorRectangle;
+  private Rectangle switchRectangle;
+  
+  private boolean overswitch;
+  private boolean overdoor;
+  private boolean switchSelected;
+  private boolean switchHighlighted;
+  
+  /**
+   * Constructs a new Exit with the given positions.
+   * @param jned a reference to the enclosing Jned instance
+   * @param x this Exit's door x position
+   * @param y this Exit's door y position
+   * @param switchX this Exit's switch x position
+   * @param switchX this Exit's switch y position
+   */
+  public Exit (Jned jned, int x, int y, int switchX, int switchY) {
+    super(jned, 12, x, y);
+    this.switchX = switchX;
+    this.switchY = switchY;
+    deltaSwitchX = 0;
+    deltaSwitchY = 0;
+    
+    overswitch = false;
+    overdoor = false;
+    switchSelected = false;
+    switchHighlighted = false;
+    
+    calculateRectangle(true);
+    calculateRectangle(false);
+    
+    setImage(ImageBank.EXIT);
+  }
+  
+  /**
+   * Returns a copy of this Exit.
+   * @return a new Exit with the same properties as this Exit
+   */
+  public Exit duplicate() {
+    return new Exit(jned, getX(), getY(), switchX, switchY);
+  }
+  
+  
+  private void calculateRectangle(boolean isDoor) {
+    if (isDoor) {
+      doorRectangle = new Rectangle(super.getX() - 13, super.getY() - 12, 26, 24);
+    } else {
+      switchRectangle = new Rectangle(switchX - 6, switchY - 4, 13, 7);
+    }
+  }
+  
+  /**
+   * Normally, returns x position of this Exit's door. However, if the switch is highlighted, this
+   * method will return the x position of the switch. This is important for consistant interaction 
+   * with the mouse.
+   * @return x position of Exit component under the mouse, or the door if no part is highlighted.
+   */
+  public int getX() {
+    if (overswitch) {
+      return switchX;
+    }
+    return super.getX();
+  }
+  
+  /**
+   * Normally, returns y position of this Exit's door. However, if the switch is highlighted, this
+   * method will return the y position of the switch. This is important for consistant interaction 
+   * with the mouse.
+   * @return y position of Exit component under the mouse, or the door if no part is highlighted.
+   */
+  public int getY() {
+    if (overswitch) {
+      return switchY;
+    }
+    return super.getY();
+  }
+  
+  /**
+   * Returns the x position of this Exit's door.
+   * @return x position of this Exit's door.
+   */
+  public int getSuperX() {
+    return super.getX();
+  }
+  
+  /**
+   * Returns the y position of this Exit's door.
+   * @return y position of this Exit's door.
+   */
+  public int getSuperY() {
+    return super.getY();
+  }
+  
+  /**
+   * Returns the x position of this Exit's switch.
+   * @return x position of this Exit's switch.
+   */
+  public int getSwitchX() {
+    return switchX;
+  }
+  
+  /**
+   * Returns the y position of this Exit's switch.
+   * @return y position of this Exit's switch.
+   */
+  public int getSwitchY() {
+    return switchY;
+  }
+  
+  /**
+   * Moves the component of this Exit under the mouse to the given position. If no component
+   * is highlighted, this method moves the door.
+   * @param x the new x position
+   * @param y the new y position
+   */
+  public void moveTo(int x, int y) {
+    if (overswitch) {
+      switchX = x;
+      switchY = y;
+      calculateRectangle(false);
+    } else {
+      super.moveTo(x, y);
+      calculateRectangle(true);
+    }
+  }
+  
+  /**
+   * Sets the reference point for relative movement, essentially the position of another Item to
+   * match movement with. Once set, calling moveRelative() with a new point will move the switch and
+   * door of this Exit by the same amount as the difference between the reference point and the
+   * supplied point.
+   * @param x the reference x position
+   * @param y the reference y position
+   */
+  public void setDelta(int x, int y) {
+    super.setDelta(x, y);
+    deltaSwitchX = x - switchX;
+    deltaSwitchY = y - switchY;
+  }
+  
+  /**
+   * Moves any selected components of this Exit to a new position relative to its reference points.
+   * The components will move by the same amount as the difference between the supplied point and
+   * this Exit's relevant reference point.
+   * <p>
+   * Optionally, all components can be moved regardless of selection using the moveAll parameter.
+   * @param x the relative x position
+   * @param y the relative y position
+   * @param moveAll true to move both components, selceted or not, false to only move selected
+   * components.
+   */
+  public void moveRelative(int x, int y, boolean moveAll) {
+    if (moveAll || super.isSelected()) {
+      super.moveRelative(x, y);
+      calculateRectangle(true);
+    }
+    if (moveAll || switchSelected) {
+      switchX = x - deltaSwitchX;
+      switchY = y - deltaSwitchY;
+      calculateRectangle(false);
+    }
+  }
+  
+  /**
+   * Moves any selected components of this Exit to a new position relative to its reference points.
+   * The components will move by the same amount as the difference between the supplied point and
+   * this Exit's relevant reference point.
+   * @param x the relative x position
+   * @param y the relative y position
+   */
+  public void moveRelative(int x, int y) {
+    moveRelative(x, y, false);
+  }
+  
+  /**
+   * Returns a String representation of this Exit, in n level code format.
+   * @return n level code String for this Exit
+   */
+  public String toString() {
+    return super.toString() + "," + switchX + "," + switchY;
+  }
+  
+  /**
+   * Returns whether or not the given point intersects with any part of this Exit. Internal values
+   * will record which part (door or switch) overlaps.
+   * @param x x coordinate of point to check for overlap
+   * @param y y coordinate of point to check for overlap
+   * @return true if point overlaps this Exit, false if it does not
+   */
+  public boolean overlaps(int x, int y) {
+    if (switchRectangle.contains(x, y)) {
+      overswitch = true;
+    } else {
+      overswitch = false;
+    }
+    if (doorRectangle.contains(x, y)) {
+      overdoor = true;
+    } else {
+      overdoor = false;
+    }
+    return overswitch || overdoor;
+  }
+  
+  /**
+   * Returns whether or not the given Rectangle intersects with any part of this Exit. Internal
+   * values will record which part (door or switch) overlaps.
+   * @param rectangle the Rectangle to check for overlap
+   * @return true if rectangle overlaps this Exit, false if it does not
+   */
+  public boolean overlaps(Rectangle rectangle) {
+    if (doorRectangle.intersects(rectangle)) {
+      overdoor = true;
+    } else {
+      overdoor = false;
+    }
+    if (switchRectangle.intersects(rectangle)) {
+      overswitch = true;
+    } else {
+      overswitch = false;
+    }
+    return overswitch || overdoor;
+  }
+  
+  /**
+   * Returns whether the component of this Exit that is currently under the mouse is selected.
+   * @return true if the highlighted component of this Exit is currently selected, false if it is
+   * not
+   */
+  public boolean isSelected() {
+    if (overswitch) {
+      return switchSelected;
+    }
+    return super.isSelected();
+  }
+  
+  /**
+   * Sets whether this Exit is selected. Will select only the component (switch or door) that is
+   * under the mouse. Optionally, both components can be selected using the selectBoth variable.
+   * @param select true to select component of Exit under the mouse, false to deselect all
+   * components
+   * @param selectBoth true to select both components of this Exit
+   */
+  public void setSelect(boolean select, boolean selectBoth) {
+    if (select == false) {
+      super.setSelect(false);
+      switchSelected = false;
+    } else {
+      if (overswitch || selectBoth) {
+        switchSelected = true;
+      }
+      if (overdoor || selectBoth) {
+        super.setSelect(true);
+      }
+    }
+  }
+  
+  /**
+   * Sets whether this Exit is selected. Will select only the component (switch or door) that is
+   * under the mouse.
+   * @param select true to select component of Exit under the mouse, false to deselect all
+   * components
+   */
+  public void setSelect(boolean select) {
+    setSelect(select, false);
+  }
+  
+  //Overrides Item.setHighlight: takes into account highlighting of switch vs. door
+  public void setHighlight(boolean highlight) {
+    if(highlight == false) {
+      super.setHighlight(false);
+      switchHighlighted = false;
+    } else {
+      if(overswitch) switchHighlighted = true;
+      if(overdoor) super.setHighlight(true);
+    }
+  }
+  
+  public void paint(Graphics g) {
+    // Door
+    boolean[] layer = {true, isHighlighted(), super.isSelected()};
+    for (int i = 0; i < 3; i++) {
+      switch (i) {
+        case 0:
+          if(jned.drawImage(getImage(), super.getX(), super.getY(), g)) {
+            layer[0] = false;
+          } else {
+            g.setColor(Colors.ITEM);
+          }
+          break;
+        case 1:
+          g.setColor(Colors.ITEM_HL_A);
+          break;
+        case 2:
+          g.setColor(Colors.ITEM_SELECT_A);
+          break;
+        default:
+      }
+      if (layer[i]) {
+        g.fillRect(doorRectangle.x, doorRectangle.y, doorRectangle.width, doorRectangle.height);
+      }
+    }
+    // Switch
+    layer[0] = true;
+    layer[1] = switchHighlighted;
+    layer[2] = switchSelected;
+    for (int i = 0; i < 3; i++) {
+      switch (i) {
+        case 0:
+          if (jned.drawImage(getImage()+1, switchX, switchY, g)) {
+            layer[0] = false;
+          } else {
+            g.setColor(Colors.ITEM);
+          }
+          break;
+        case 1:
+          g.setColor(Colors.ITEM_HL_A);
+          break;
+        case 2:
+          g.setColor(Colors.ITEM_SELECT_A);
+          break;
+        default:
+      }
+      if(layer[i]) {
+        g.fillRect(switchRectangle.x, switchRectangle.y, switchRectangle.width,
+            switchRectangle.height);
+      }
+    }
+  }
+  
+  /**
+   * Paints a line connecting the door to the switch of this Exit.
+   * @param g Graphics context with which to paint trigger line
+   */
+  public void paintTrigger(Graphics g) {
+    g.setColor(Colors.DOOR_TRIGGER);
+    g.drawLine(super.getX(), super.getY(), switchX, switchY);
+  }
+  
+  /**
+   * Paints a translucent silhouette of an Exit door with the given position
+   * @param x the x coordinate to draw door ghost at
+   * @param y the y coordinate to draw door ghost at
+   * @param g Graphics context to draw door ghost with
+   */
+  public static void paintDoorGhost(int x, int y, Graphics g) {
+    g.setColor(Colors.ITEM_GHOST);
+    g.fillRect(x - 13, y - 12, 26, 24);
+  }
+  
+  /**
+   * Paints a translucent silhouette of an Exit switch with the given coordinates and door with
+   * the given position, as well as a trigger line connecting them.
+   * @param x the x position to draw door ghost at
+   * @param y the y position to draw door ghost at
+   * @param switchX the x coordinate to draw switch ghost at
+   * @param switchY the y coordinate to draw switch ghost at
+   * @param g Graphics context to draw ghosts with
+   */
+  public static void paintSwitchGhost(int x, int y, int switchX, int switchY, Graphics g) {
+    Exit.paintDoorGhost(x, y, g);
+    
+    g.setColor(Colors.ITEM_GHOST);
+    g.fillRect(switchX - 6, switchY - 4, 13, 7);
+    
+    g.setColor(Colors.DOOR_TRIGGER);
+    g.drawLine(x, y, switchX, switchY);
+  }
 }
